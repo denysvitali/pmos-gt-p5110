@@ -1,0 +1,22 @@
+{
+  "pmbootstrap": {
+    "url": "https://gitlab.nura.eco/nura/pmbootstrap.git",
+    "ref": "3.12.1",
+    "commit": "7d23010a125ca7386fec4e390d14128b6c24d266"
+  },
+  "pmaports": {
+    "url": "https://gitlab.nura.eco/postmarketOS/pmaports.git",
+    "ref": "main",
+    "commit": "c33fd8ac3a8f05bc36c633c2233023e3ca70b847"
+  },
+  "linux_openpvrsgx": {
+    "url": "https://github.com/openpvrsgx-devgroup/linux_openpvrsgx.git",
+    "ref": "pvrsrvkm-7.1",
+    "commit": "c9c94731b070aa5050d8946230d772ec3df9b95c"
+  },
+  "pvrports": {
+    "url": "https://gitlab.com/pvrports/pvrports.git",
+    "ref": "edge",
+    "note": "reference only: sgx-ddk-um 1.17.4948957 blobs and mesa-pvr-dri-classic 21.3.9; its kernel is pinned to 6.1"
+  }
+}
