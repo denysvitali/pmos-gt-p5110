@@ -109,3 +109,23 @@ took effect.
 After: user.slice CPU pressure 7%, 572 MiB available, one gnome-shell
 (`--mode=user`), no new external aborts [verified]. Rendering is still
 software-only until the SGX stack lands.
+
+### Root cause of the aborts: secure-world RAM mapped as System RAM
+
+- Build #2 at 800 MHz also died with imprecise external aborts (5540 s), which
+  **refutes** the 1008 MHz/undervolt hypothesis [verified].
+- Stock kernel (`CyanogenMod/android_kernel_samsung_espresso10` cm-10.2,
+  `board-espresso.c:espresso_reserve`, `omap4_ion.c`) calls `memblock_remove()`
+  on the SMC (3 MiB at `0xbfd00000`) and the secure-input heap (`tiler1d_size`,
+  14 MiB at `0xbef00000`) [verified, source]. Mainline maps both as System RAM
+  [verified, /proc/iomem].
+- Positive control: `stress-ng --vm 2 --vm-bytes 75% --vm-method all --verify`
+  hit an abort after 170 s (FSR 0x1c06) [verified].
+- Fix: `reserved-memory` nodes `secure-input@bef00000` (0xe00000) and
+  `smc@bfd00000` (0x300000), no-map. Tested on the running 7.0.5 kernel by
+  editing `/boot/dtbs/…espresso10.dtb` + `mkinitfs` (KERNEL partition readback ==
+  boot.img, fixed DTB inside). After reboot System RAM ends at `0xbeefffff`.
+  The same stress run for 900 s: **0 aborts, 0 verify failures** [verified].
+- Kernel overlay: `0012-ARM-dts-omap4-espresso-reserve-secure-RAM.patch`.
+  Pre-fix KERNEL partition saved as `scratch/kernel-part/kernel-part-pre-dtfix.img`
+  (sha256 `dbc21997…`).

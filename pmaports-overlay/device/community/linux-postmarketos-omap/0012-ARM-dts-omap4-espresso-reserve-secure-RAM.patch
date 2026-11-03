@@ -1,0 +1,33 @@
+From: Denys Vitali <denys@denv.it>
+Subject: [PATCH] ARM: dts: omap4: espresso: reserve secure-world RAM
+
+The stock espresso kernel removes the SMC (3 MiB at 0xbfd00000) and the
+secure-input heap (14 MiB at 0xbef00000) from memblock. Mainline maps
+them as RAM; under memory pressure this produces imprecise external
+aborts (SIGBUS in userspace). Reproduced with stress-ng; see
+pmos-galaxy docs/bringup.md.
+---
+--- a/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso-common.dtsi	2026-11-03 12:03:46.923277668 +0000
++++ b/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso-common.dtsi	2026-11-03 12:03:48.187259288 +0000
+@@ -20,6 +20,21 @@
+ 			reg = <0xbef00000 (1024 * 600 * 4)>;
+ 			no-map;
+ 		};
++
++		/*
++		 * Stock (Samsung/TI) kernels memblock_remove() the top 17 MiB of RAM:
++		 * the secure-input ION heap (tiler1d, 14 MiB) and the secure monitor
++		 * (SMC, 3 MiB). Linux touching them raises imprecise external aborts.
++		 */
++		secure_input: secure-input@bef00000 {
++			reg = <0xbef00000 0xe00000>;
++			no-map;
++		};
++
++		smc: smc@bfd00000 {
++			reg = <0xbfd00000 0x300000>;
++			no-map;
++		};
+ 	};
+ 
+ 	chosen {
