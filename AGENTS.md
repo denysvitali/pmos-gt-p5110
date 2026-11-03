@@ -11,6 +11,8 @@ GPU acceleration, for kiosk-style reuse. Findings live in `docs/recon.md`.
   run in GitHub Actions (`.github/workflows/build.yml` → `scripts/ci/build.sh`).
 - Every source is pinned in `sources.lock.json`; bump pins deliberately.
 - Our package changes live in `pmaports-overlay/`, copied over pinned pmaports.
+- Remote `git@github.com:denysvitali/pmos-gt-p5110.git`, pushed with the
+  deploy key `/root/.ssh/pmos-gt-p5110_deploy` (set in `core.sshCommand`).
 
 ## Device access
 
