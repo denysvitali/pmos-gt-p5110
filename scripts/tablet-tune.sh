@@ -3,15 +3,11 @@
 # running tablet. Idempotent. Run on the tablet as root.
 set -eu
 
-# 1008 MHz faults (imprecise external aborts): no cpu0-supply in the DT, so
-# cpufreq raises the clock without raising the voltage.
-install -d /etc/tmpfiles.d
-cat > /etc/tmpfiles.d/90-pmos-galaxy-cpufreq.conf <<'EOF'
-# pmos-galaxy: 1008 MHz OPP faults (imprecise external aborts); no cpu0-supply in DT
-w /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq - - - - 800000
-w /sys/devices/system/cpu/cpu1/cpufreq/scaling_max_freq - - - - 800000
-EOF
-systemd-tmpfiles --create /etc/tmpfiles.d/90-pmos-galaxy-cpufreq.conf
+# Earlier 800 MHz cap was a wrong diagnosis (see docs/bringup.md); remove it.
+rm -f /etc/tmpfiles.d/90-pmos-galaxy-cpufreq.conf
+for c in /sys/devices/system/cpu/cpu*/cpufreq; do
+	cat "$c/cpuinfo_max_freq" > "$c/scaling_max_freq"
+done
 
 # CPU hogs with no kiosk value: file indexer, colour management.
 systemctl --global mask \
@@ -30,4 +26,4 @@ if ! grep -q '^AutomaticLoginEnable=True' "$conf"; then
 fi
 grep -q '^AutomaticLogin=user$' "$conf" || { echo "ERROR: autologin not set" >&2; exit 1; }
 
-echo "OK: cpufreq cap $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz; autologin set (applies on next gdm start)"
+echo "OK: max freq $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz; autologin set (applies on next gdm start)"
