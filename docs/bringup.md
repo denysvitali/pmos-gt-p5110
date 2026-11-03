@@ -56,3 +56,24 @@ readback md5 `c9884978…` matched [verified].
   boot recurs (initramfs → rootfs gadget) [verified]. The later permanent drops
   may have been Sxmo suspend [guessed]; the journals of those boots were lost in
   the reflash.
+
+## B2 — GNOME Mobile + Wi-Fi + native GPU build, 2026-11-03
+
+- Wi-Fi: NM keyfile (root-only, from `/root/wifi.txt`) → `wlan0` connected,
+  `192.168.30.236`, NTP fixed the clock; reachable from the Pi via
+  192.168.10.1, and survives a warm reboot [verified]. The dev user has NOPASSWD
+  sudo (`/etc/sudoers.d/90-pmos-galaxy-dev`).
+- Root fs grown online is refused (`resize2fs: Resource busy`); the initramfs
+  grew it on the next boot: `/` = 11.2G [verified].
+- UI: `postmarketos-ui-gnome-mobile` installed, sxmo removed, gdm enabled,
+  sleep targets masked. `gnome-shell --mode=gdm` runs on a GBM renderer
+  using software rendering (zink: no Vulkan; EGL: dri2 screen fails) [verified, journal].
+  Not yet seen on screen.
+- GNOME/SGX compatibility (source/binary level, not run): mutter-mobile 48
+  ships Cogl's GLES2 driver; it imports `gbm_bo_create_with_modifiers2`, which
+  Mesa-PVR 21.3.9 exports [verified, strings/readelf/source]. mutter
+  references `GL_EXT_unpack_subimage`, which PVRports had to patch around in phoc [inferred
+  risk].
+- Kernel: `linux-postmarketos-omap` 7.1.5-r50 + pvrsgx 1.17 building natively
+  with GCC 15.2 (`abuild`, systemd unit `kbuild`, JOBS=2). Final .config:
+  `SGX=y PVRSGX_1_17_4948957=y SGX_DRM=y SGX_OMAP=m`, CFI off [verified].
