@@ -63,7 +63,6 @@ replaces="linux-samsung-espresso3g linux-nokia-n900"
 
 prepare() {
 	default_prepare
-	xz -dc "$srcdir"/pvrsgx-1.17.patch.xz | patch -p1 -N --quiet
 	cp -v "$srcdir"/$_config .config
 	make ARCH="$_carch" olddefconfig
 }
@@ -89,7 +88,7 @@ package() {
 
 sha512sums="
 17f95307b6e86a0794df146d97256ba4783b7a494f5eb43aafc14d64367541874cec7f6e8c2ea724eca149db18e4bd5880bf28a8c5e47ae8a769776bbd955af8  linux-7.1.5.tar.xz
-b01da60f2543caeab6f8510575d5886aed06e6ac03cfc38b6f1d4ba32d678b1bbfab5f0765ffeec94ba32a2a5e731f6827e99d637146890ec964f297ac14f431  config-postmarketos-omap.armv7
+a91e00d353ea502e28ee1f405a03070f15865d5bb606c7bdab08a238550be722b2ae6aac4d967dced95e1020faf87cbcf87a63dcfc778115ff3bca3a780a72ce  config-postmarketos-omap.armv7
 1a68e3a32ae1e56d325c0f759ee66d64d14f46a5d52e75ae008dfddac335beb3aa7acaf62abb95b6d5ce1557f0cf9b4c31ab78e110af178db1ac963bb377dbf0  0001-iio-rescale-revert-logic.patch
 11bcc2bdcd8862e56f23a763d393b1d5f62af82cfd6dd347b5786b9f299144950d5941579091fea144371bad1188f366d8cd5a26453fc852fd3e769df2bd21bc  0002-hsi-dma-fix.patch
 a17ddc7a41ce2a6be04a8ee0ffcfb8dbb0381d1ce7fac8336befd79bc388ce5d16b6ba3a4732a540a43add55c43b015a3b77205a007a058d4d6e3291234b5cc0  0003-Add-TWL6030-power-button-support-to-twl-pwrbutton.patch
@@ -101,4 +100,5 @@ b968d9901efa9a89727e2b0fb50a0b47992a495c55aeda92784394c37acab0236cc256f0ee82edbf
 ccde740a45a90037739e14b64215c5ffbad5c23572b98baf8d85c6b1aa598ca79abfab5d980cbe9bece56858d2517f8a27b809f153ebf1f1c0d37bb0446613bc  0009-usb-musb-omap2430-handle-initial-ID-ground-transitio.patch
 c4db84620e6fb4e7f279ab0d82493400d06e8bf3195c2e30196b9f7421166fa804d54a59a8f6030ce4ae7e8d2432ee08dd19e6de915436f0f7e8ebe1f4ce1de4  0010-usb-phy-twl6030-add-extcon-and-external-VBUS-support.patch
 1100e084f4058bdaaf5b193b3b316f76fb55ddde9c4d5091a133db96468df438de8f0afe2d3127745c2896bf52f63af8d59522c9512bc992aa5e3194cfe2489f  0011-ARM-dts-omap4-espresso-add-USB-OTG-support.patch
+ab933538348f7adc2ebe1af94bdca4deba8edbe93c4c20ca9d7ca501584b709953a0d52747c28e535e4a68b53388a7174e4690aabaef322e3fb9f4cbe8959efb  pvrsgx-1.17.patch.xz
 "
