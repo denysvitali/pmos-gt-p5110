@@ -1,0 +1,140 @@
+# Maintainer: Jonathan Bakker <xc-racer2@live.ca>
+
+pkgname=mesa-pvr-dri-classic
+pkgver=21.3.9
+pkgrel=50
+pkgdesc="Mesa (Amber) DRI OpenGL library with PowerVR patches"
+url="https://github.com/MightyM17/mesa-pvr/tree/amber-pvr"
+arch="armhf armv7 aarch64"
+license="MIT SGI-B-2.0 BSL-1.0"
+depends_dev="
+	libdrm-dev
+	libxext-dev
+	libxdamage-dev
+	libxcb-dev
+	libxshmfence-dev
+	"
+makedepends="
+	$depends_dev
+	bison
+	eudev-dev
+	expat-dev
+	findutils
+	flex
+	gettext
+	elfutils-dev
+	libglvnd
+	libtool
+	libunwind-dev
+	libxfixes-dev
+	libva-dev
+	libvdpau-dev
+	libx11-dev
+	libxrandr-dev
+	libxt-dev
+	libxvmc-dev
+	libxxf86vm-dev
+	makedepend
+	meson
+	py3-mako
+	py3-libxml2
+	py3-setuptools
+	python3
+	talloc-dev
+	wayland-dev
+	wayland-protocols
+	xorgproto
+	zlib-dev
+	zstd-dev
+	"
+# For now, mainline mesa and mesa-amber cannot get installed together
+# Upstream mesa needs libglvnd and -Dglvnd=auto in their build
+# See https://gitlab.archlinux.org/archlinux/packaging/packages/mesa-amber/-/blob/dac30b1916b3612ff09af01703170211cf51a97e/PKGBUILD#L42
+#depends="mesa"
+provides="mesa mesa-dri-gallium mesa-gbm mesa-glapi"
+subpackages="
+	$pkgname-dev
+"
+_commit="eaad230a3f4d6874923a255f69521e2c105ea331"
+source="
+	$pkgname-$_commit.tar.gz::https://github.com/MightyM17/mesa-pvr/archive/$_commit.tar.gz
+	Replace-LLVMConstF-with-LLVMBuild-methods.patch
+	Fix-meson-build-system-and-build-pvr-driver.patch
+	50-pvr.conf
+	"
+options="!check" # we skip tests intentionally
+builddir="$srcdir/mesa-pvr-$_commit"
+
+_dri_driverdir=/usr/lib/xorg/modules/dri
+_dri_drivers="pvr"
+
+prepare(){
+	default_prepare
+
+	# apply mesa patches
+	cd "$builddir"
+	grep "\.patch$" debian/patches/series | \
+		xargs -I {} -t -r -n1 patch -p1 -i debian/patches/{}
+}
+
+build() {
+	export CFLAGS="$CFLAGS -D_XOPEN_SOURCE=700"
+	export MESA_GIT_SHA1_OVERRIDE=53b2b224dc2de982c37915a0ad218e33365ff75e
+
+	python3 bin/git_sha1_gen.py --output include/git_sha1.h
+
+	# Reasoning for gallium-drivers="swrast":
+	# https://gitlab.com/postmarketOS/pmaports/-/merge_requests/2049#note_543436715
+	abuild-meson \
+		-Damber=true \
+		-Ddri-drivers-path=$_dri_driverdir \
+		-Dgallium-drivers="swrast" \
+		-Ddri-drivers=$_dri_drivers \
+		-Dvulkan-drivers="" \
+		-Dplatforms=x11,wayland \
+		-Dllvm=false \
+		-Dshared-llvm=true \
+		-Dshared-glapi=true \
+		-Dgbm=true \
+		-Dglx=dri \
+		-Dopengl=true \
+		-Dgles1=true \
+		-Dgles2=true \
+		-Dglvnd=auto \
+		-Degl=true \
+		-Db_ndebug=true \
+		-Dmicrosoft-clc=disabled \
+		$_arch_opts \
+		. output
+
+	# Print config
+	meson configure output
+
+	# parallel build workaround
+	ninja -C output src/compiler/nir/nir_intrinsics.h
+
+	meson compile ${JOBS:+-j ${JOBS}} -C output
+}
+
+package() {
+	DESTDIR="$pkgdir" meson install --no-rebuild -C output
+	install -Dm644 output/src/mesa/drivers/dri/libamber_dri_drivers.so \
+		"$pkgdir/$_dri_driverdir"/pvr_dri.so
+
+	install -Dm644 output/src/gallium/targets/dri/libgallium_dri.so \
+		"$pkgdir/$_dri_driverdir"/swrast.so
+	install -Dm644 "$srcdir"/50-pvr.conf "$pkgdir"/usr/lib/environment.d/50-pvr.conf
+}
+
+dev() {
+	default_dev
+	provides="mesa-dev"
+}
+
+
+sha512sums="
+e2ba3c1d0e6d53e8e825ce038531fe0b04911774f7438aa2a6d36420323482a89e00f07ddb584fa2af98f627234c9e9560bae3f126d865d6c93a21b4f8a981ae  mesa-pvr-dri-classic-eaad230a3f4d6874923a255f69521e2c105ea331.tar.gz
+c5d215a24369a1adc27c3b457bac7e40710d198b59ea263274c0361a485a64408f7b73cd291087f110d672fb7b945a8e4f610004eb044723977b64b38f7c6451  Replace-LLVMConstF-with-LLVMBuild-methods.patch
+6c6498bf7e9cc3b1a60a0861cdf4ec6f9aa920223b2f99269cfe884ca8063689f9b95e165782e6f6ba3fec283ae6aa5ac38dd8066f467c4367818e31f0bd1dff  Fix-meson-build-system-and-build-pvr-driver.patch
+23b2e351ae81a6a0dfe63223796d97c223301c2ac54725c22da0cbd86ff87e68eb22c767f0d729fc1d3217d415e61d031970abdbd6ace9d5f04802a546d677b2  pvr-wayland.sh
+"

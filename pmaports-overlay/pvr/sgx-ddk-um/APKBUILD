@@ -1,0 +1,70 @@
+# Maintainer: Jonathan Bakker <xc-racer2@live.ca>
+pkgname=sgx-ddk-um
+pkgver=1.17.4948957
+_commit=c7dbb0a08424a4fb1c034444b00f10781c4e7108
+pkgrel=50
+pkgdesc="(WARNING: runs as root) Proprietary userspace libraries for PowerVR SGX GPUs"
+url="https://git.ti.com/cgit/graphics/omap5-sgx-ddk-um-linux"
+arch="armhf armv7 aarch64"
+license="proprietary"
+options="!check !strip !tracedeps" # no test suite available
+makedepends="autoconf automake m4 libtool mesa-pvr-dri-classic-dev libdrm-dev"
+depends="libc6-compat gcompat"
+subpackages="
+	$pkgname-ti343x:soc
+	$pkgname-ti443x:soc
+	"
+source="
+	https://github.com/MightyM17/sgx-ddk-um/archive/$_commit.tar.gz
+	pvrsrvinit.service
+	90-sgx-ddk-um.preset
+	"
+builddir="$srcdir/sgx-ddk-um-$_commit"
+
+prepare() {
+	default_prepare
+	autoreconf -v -f -i
+}
+
+copy_soc_files() {
+	local soc_name=$1
+	local soc_path="$subpkgdir/usr/lib"
+	local soc_bin="$subpkgdir/usr/bin"
+	mkdir -p $soc_path
+	mkdir -p $soc_bin
+
+	cd $builddir
+	cp -a $soc_name/usr/lib/* $soc_path/
+	cp -a $soc_name/usr/bin/* $soc_bin/
+}
+
+build() {
+	# Force detection of gbm library
+	export GBM_LIBS=/usr/lib
+	export GBM_CFLAGS=/usr/include
+	./configure \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--sbindir=/usr/sbin 
+	make
+}
+
+package() {
+	make install DESTDIR="$pkgdir"
+	install -Dm644 "$srcdir"/pvrsrvinit.service "$pkgdir"/usr/lib/systemd/system/pvrsrvinit.service
+	install -Dm644 "$srcdir"/90-sgx-ddk-um.preset "$pkgdir"/usr/lib/systemd/system-preset/90-sgx-ddk-um.preset
+}
+
+soc() {
+	local n=${subpkgname##sgx-ddk-um-}
+	provides=sgx-ddk-um-soc=$pkgver
+	depends="sgx-ddk-um gcompat"
+
+	copy_soc_files $n
+}
+
+sha512sums="
+513daca43bfaf4fa23a127ba77d51a9fed4e5a0c736dddf13e6cf36945fda93a1a801c68795bf638e55f9634949c85c166f1213295b55233c6397ad6fbf5ca08  c7dbb0a08424a4fb1c034444b00f10781c4e7108.tar.gz
+a917cee7fa9ada1deded9b70bdc34a921ac9bb0a8b3e401a6cbfba4d5f07fd725dee74a1e5ddc237a8f5753956ea7ae722405c0e1f694ad36dfea933fa1d23b7  sgx-ddk-um.initd
+"

@@ -1,0 +1,14 @@
+[Unit]
+Description=Initialize PowerVR SGX services
+After=systemd-modules-load.service systemd-udev-settle.service
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/pvrsrvinit
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

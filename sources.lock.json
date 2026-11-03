@@ -17,6 +17,7 @@
   "pvrports": {
     "url": "https://gitlab.com/pvrports/pvrports.git",
     "ref": "edge",
-    "note": "reference only: sgx-ddk-um 1.17.4948957 blobs and mesa-pvr-dri-classic 21.3.9; its kernel is pinned to 6.1"
+    "commit": "b7ee11fd954428eec3871870a784dc144ea5c5c4",
+    "note": "source of pmaports-overlay/pvr/{sgx-ddk-um,mesa-pvr-dri-classic}, adapted from OpenRC to systemd"
   }
 }
