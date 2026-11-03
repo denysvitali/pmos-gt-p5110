@@ -77,3 +77,16 @@ readback md5 `c9884978…` matched [verified].
 - Kernel: `linux-postmarketos-omap` 7.1.5-r50 + pvrsgx 1.17 building natively
   with GCC 15.2 (`abuild`, systemd unit `kbuild`, JOBS=2). Final .config:
   `SGX=y PVRSGX_1_17_4948957=y SGX_DRM=y SGX_OMAP=m`, CFI off [verified].
+
+### B2 kernel build #1 failed: imprecise external aborts at 1008 MHz
+
+At ~36 min, GCC (ICE "Bus error" in kernel/ptrace.c) and `as` (Bus error) died
+together; dmesg shows `Unhandled fault: imprecise external abort (0x1406)` twice
+at those times [verified]. Ruled out: /tmp full (0%), eMMC/ext4/OOM errors
+(none in dmesg) [verified]. CPU was at 1008000 kHz (ondemand), thermal zone0 75 °C
+[verified].
+Mainline `omap443x.dtsi` OPPs: 300/600/800/1008 MHz at 1.025/1.2/1.313/1.375 V,
+but espresso has no `cpu0-supply`, and no MPU core regulator is exposed (only
+`abb_mpu`). cpufreq scales frequency without voltage [verified, DT and sysfs].
+Hypothesis: undervolted at 1008 MHz [inferred]. Test: build #2 with
+`scaling_max_freq=800000` on both CPUs, clean rebuild, watching for new aborts.
