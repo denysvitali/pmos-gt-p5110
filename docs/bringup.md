@@ -23,3 +23,36 @@ tablet is off, hung, or in a charge/bootloader screen. Candidate causes, none
 tested: the gadget reconfiguring from initramfs to rootfs, followed by a hang or
 power-off; a kernel panic (no auto-reboot); the reported power-off/charging
 quirks [guessed].
+
+### Correction: host firewall, not the tablet
+
+The Pi carries `DUMPLING_INPUT -d 172.16.42.0/24 -j DROP` (the OnePlus project's
+iptables chain). All inbound traffic from the tablet was dropped on the host:
+tcpdump showed ICMP replies and SYN-ACKs reaching `eth1` while `ping`/`ssh` timed
+out [verified]. The "no ICMP/TCP" observations above are therefore about the Pi,
+not the tablet. Workaround: a non-persistent `iptables -I INPUT 1 -i eth1
+-s 172.16.42.1 -m mac --mac-source <tablet MAC> -j ACCEPT`. The tablet's gadget MAC
+changes every boot (26:21:e7:… then b6:f4:27:…), so the rule must be re-added each
+boot.
+
+## B1b — same image + sshd enabled, key, sxmo.nosuspend, 2026-11-03
+
+The stock image ships `80-pmbootstrap-install-disable-sshd.preset` (sshd off)
+[verified]. On the host's copy of the image we added the
+`multi-user.target.wants/sshd.service` symlink, `~user/.ssh/authorized_keys`, and
+`~user/.cache/sxmo/sxmo.nosuspend`; `e2fsck -fn` was clean. Flashed through recovery: DATAFS
+readback md5 `c9884978…` matched [verified].
+
+- SSH key login works; reachable at 10 min uptime [verified].
+- Kernel `7.0.5 #3-postmarketOS`, Xorg + Sxmo (dwm), 988 MiB RAM, battery 87%
+  with status "Unknown" [verified].
+- DRM: `card0`, `card0-LVDS-1`, `renderD128`; omapdrm WARN at
+  `dss_set_fck_rate` (dss.c:656) during probe [verified]. Possible link to the
+  horizontal stripes in the photo [guessed].
+- gp2ap002 proximity/light sensor probe fails (-121); some ti-sysc probe
+  errors [verified].
+- Root uses 1 GiB of the 12 GiB DATAFS; the GPT was not grown [verified, dmesg].
+- Cause of the earlier USB drops: still unproven. A re-enumeration ~70 s into
+  boot recurs (initramfs → rootfs gadget) [verified]. The later permanent drops
+  may have been Sxmo suspend [guessed]; the journals of those boots were lost in
+  the reflash.
