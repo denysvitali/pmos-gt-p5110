@@ -78,3 +78,19 @@ Download mode lives in SBL, which a pmOS install does not touch [inferred].
    `linux-postmarketos-omap` 7.1.5 as an overlay package; build in CI.
 3. Userspace: port `sgx-ddk-um` + `mesa-pvr-dri-classic` from PVRports into the
    overlay; target a kiosk compositor.
+
+## Partition backup — 2026-11-03 [verified]
+
+Read via `adb root` + `cat`; each image's SHA-256 matched the on-device
+`sha256sum`. Images are in `scratch/backup-20261103/` on the Pi only (gitignored;
+EFS is device-unique and must not be published).
+
+```
+3c98fba8c34d71a5ae0c9c09134492e97beb4098be6abeff192e67a575ac119b  EFS.img
+b53d76e3a5462aad0ebb44fe4f2cbc890edabd273c824e6d8c13f01969791478  KERNEL.img
+f3758eb7f2a32f07fdce41d54ed095ee970cee4733b61b3b69d8b11208b568ec  MODEM.img
+679e5b1b4a53009b878013a160edaea49ad6e986cd6f5257dc99bbe8741998d0  PARAM.img
+6f43b8d128a859e9155d4d4bce64d544e54c8025043f1971e5496e879b8c1833  RECOVERY.img
+d36551538c9d409c8d899ea79a13aa9c935d3d9277aa6567b7e9fbeb94b15eb2  SBL1.img
+5647f05ec18958947d32874eeb788fa396a05d0bab7c1b71f112ceb7e9b31eee  SBL2.img
+```
