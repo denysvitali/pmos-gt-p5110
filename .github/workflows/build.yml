@@ -2,7 +2,6 @@ name: build
 
 on:
   push:
-  pull_request:
   workflow_dispatch:
     inputs:
       ui:
@@ -14,7 +13,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, pmos-gt-p5110]
     steps:
       - uses: actions/checkout@v4
       - run: shellcheck scripts/ci/*.sh
@@ -22,15 +21,10 @@ jobs:
 
   image:
     needs: lint
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, pmos-gt-p5110]
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
-
-      - name: Free runner disk
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
 
       - name: Build image
         env:

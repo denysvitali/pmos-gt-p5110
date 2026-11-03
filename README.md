@@ -10,7 +10,9 @@ GPU acceleration.
 
 ## CI
 
-`build` runs on every push: shellcheck, then a pinned pmbootstrap builds
+`build` runs on every push, on a self-hosted runner labelled
+`[self-hosted, linux, pmos-gt-p5110]` (none registered yet; the tablet is meant
+to become it): shellcheck, then a pinned pmbootstrap builds
 the `samsung-espresso10` image and uploads `*.img.xz` + `SHA256SUMS`.
 Manual runs accept a UI and a list of packages to rebuild from source.
 

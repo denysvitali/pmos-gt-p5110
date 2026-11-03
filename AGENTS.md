@@ -8,7 +8,9 @@ GPU acceleration, for kiosk-style reuse. Findings live in `docs/recon.md`.
 ## Builds
 
 - Never build on the host: it is a Raspberry Pi whose `/root` is full. Builds
-  run in GitHub Actions (`.github/workflows/build.yml` → `scripts/ci/build.sh`).
+  run in GitHub Actions on a self-hosted runner labelled `pmos-gt-p5110`
+  (`.github/workflows/build.yml` → `scripts/ci/build.sh`). The plan is for the
+  tablet itself to be that runner. No runner is registered yet.
 - Every source is pinned in `sources.lock.json`; bump pins deliberately.
 - Our package changes live in `pmaports-overlay/`, copied over pinned pmaports.
 - Remote `git@github.com:denysvitali/pmos-gt-p5110.git`, pushed with the
