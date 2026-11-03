@@ -90,3 +90,22 @@ but espresso has no `cpu0-supply`, and no MPU core regulator is exposed (only
 `abb_mpu`). cpufreq scales frequency without voltage [verified, DT and sysfs].
 Hypothesis: undervolted at 1008 MHz [inferred]. Test: build #2 with
 `scaling_max_freq=800000` on both CPUs, clean rebuild, watching for new aborts.
+
+### "Device super slow" — measured and fixed (2026-11-03 11:25–11:40)
+
+Before: load 8.6 on 2 cores, `/proc/pressure/cpu` some=87%, memory pressure ~0%,
+410 MiB available [verified]. Consumers: kernel build 2×cc1 (~35%),
+`localsearch-3` indexer 24%, software-rendered gnome-shell 21%, `gsd-color` 10–25%
+(spinning), plus a second full GNOME stack: the GDM greeter stayed resident after login
+[verified, top]. The CPU is capped at 800 MHz on purpose.
+
+Applied (`scripts/tablet-tune.sh` makes it reproducible): build unit
+`CPUWeight=idle IOWeight=10`; localsearch and gsd-color masked globally; GDM
+autologin (no greeter); persistent 800 MHz cap via tmpfiles.d. Restarting GDM
+once hit "gdm-greeter-2 not preallocated", which `systemctl stop/start gdm`
+cleared. gsd-color needed `systemctl --user daemon-reload` before the mask
+took effect.
+
+After: user.slice CPU pressure 7%, 572 MiB available, one gnome-shell
+(`--mode=user`), no new external aborts [verified]. Rendering is still
+software-only until the SGX stack lands.
