@@ -149,3 +149,20 @@ autologin, 1 d 15 h uptime [verified].
   (sysfs, not persisted).
 - The earlier "screen dark after boot" reports: same cause probable, not
   proven per boot [inferred].
+
+## B4 — tablet as the GitHub Actions runner, 2026-11-16
+
+- The runner (v2.338.2, linux-arm, sha256 `9677d617…` matched in both the asset
+  digest and the release notes) is glibc .NET, and pmOS is musl. It runs in a
+  Debian armhf chroot `/srv/runner-debian` as user `runner`
+  (`scripts/runner/install.sh`, unit `actions-runner.service`, CPUWeight=idle).
+- A trixie chroot failed registration: `AuthenticationException … certificate
+  chain: NotTimeValid`, with the clock correct and `curl` in the same chroot
+  working [verified, _diag log]. With bookworm's `libssl3` 3.0.20 loaded
+  (LD_LIBRARY_PATH, same chroot, same token) registration succeeded
+  [verified]. Cause: the runner's .NET expects 32-bit time_t, but trixie armhf's
+  `libssl3t64` uses 64-bit time_t [inferred from the paired runs].
+  The chroot is therefore bookworm.
+- CI job timeout raised to 720 min (native 2-core build). CI now also
+  uploads the built `.apk`s, so a kernel can be installed into the running
+  system without flashing a whole image.

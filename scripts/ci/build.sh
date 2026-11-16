@@ -63,6 +63,17 @@ done
 
 pmb install --password "$PMOS_PASSWORD"
 
+# Packages we built, so a kernel can be installed into an existing system.
+pkgs=$(pmb config work)/packages
+mkdir -p "$out/packages"
+find "$pkgs" -name '*.apk' -newer "$work/pmaports/.git/HEAD" -exec cp {} "$out/packages/" \;
+for pkg in ${PMOS_FORCE_BUILD:-}; do
+	if ! ls "$out/packages/$pkg"-[0-9]*.apk >/dev/null 2>&1; then
+		echo "ERROR: forced package $pkg not in $out/packages" >&2
+		exit 1
+	fi
+done
+
 exp="$work/export"
 rm -rf "$exp"
 pmb export "$exp"
@@ -77,4 +88,4 @@ if ! ls "$out"/*.img >/dev/null 2>&1; then
 	exit 1
 fi
 xz -T0 -v "$out"/*.img
-(cd "$out" && sha256sum ./*.xz > SHA256SUMS && cat SHA256SUMS)
+(cd "$out" && sha256sum ./*.xz packages/*.apk > SHA256SUMS && cat SHA256SUMS)

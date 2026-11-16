@@ -22,7 +22,7 @@ jobs:
   image:
     needs: lint
     runs-on: [self-hosted, linux, pmos-gt-p5110]
-    timeout-minutes: 240
+    timeout-minutes: 720
     steps:
       - uses: actions/checkout@v4
 

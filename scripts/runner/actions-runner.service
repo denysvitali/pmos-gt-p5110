@@ -1,0 +1,19 @@
+[Unit]
+Description=GitHub Actions runner (Debian chroot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStartPre=/usr/local/sbin/runner-chroot-mounts up
+ExecStart=/usr/sbin/chroot /srv/runner-debian /usr/sbin/runuser -u runner -- /home/runner/actions-runner/run.sh
+ExecStopPost=/usr/local/sbin/runner-chroot-mounts down
+KillMode=process
+KillSignal=SIGINT
+Restart=always
+RestartSec=30
+# Builds must not starve the kiosk UI.
+CPUWeight=idle
+IOWeight=10
+
+[Install]
+WantedBy=multi-user.target
