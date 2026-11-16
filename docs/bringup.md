@@ -166,3 +166,7 @@ autologin, 1 d 15 h uptime [verified].
 - CI job timeout raised to 720 min (native 2-core build). CI now also
   uploads the built `.apk`s, so a kernel can be installed into the running
   system without flashing a whole image.
+- First jobs failed in `actions/checkout`: `InvalidOperationException: Linux
+  ARM32 runners are no longer supported` [verified, Worker _diag log]. The
+  workflow now uses only shell steps (git checkout with the job token).
+  Outputs stay on the tablet in `/srv/runner-debian/home/runner/out/<sha>`.
