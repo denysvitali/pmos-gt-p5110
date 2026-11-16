@@ -129,3 +129,23 @@ software-only until the SGX stack lands.
 - Kernel overlay: `0012-ARM-dts-omap4-espresso-reserve-secure-RAM.patch`.
   Pre-fix KERNEL partition saved as `scratch/kernel-part/kernel-part-pre-dtfix.img`
   (sha256 `dbc21997…`).
+
+## B3 — "screen doesn't turn on after boot", 2026-11-16
+
+Running: stock kernel 7.0.5 with the secure-RAM DTB fix, GNOME Mobile, GDM
+autologin, 1 d 15 h uptime [verified].
+- Panel side was healthy: `card0-LVDS-1` connected, but DPMS `Off`, connector
+  `disabled`, backlight `bl_power=4` (powerdown) [verified, sysfs].
+- Software blanked it, not a driver fault. The gnome-shell journal shows
+  `idle-blank` 1401 times this boot. The session was locked (`lock-enabled=true`,
+  `idle-delay=300`). Once locked, every wake re-blanks after ~10 s
+  [verified, journal].
+- Wakes came from "external power" flipping true/false every 1–5 min
+  [verified, journal]. The battery reports `STATUS=Unknown` and `smb347` fails
+  probe (-2), so charger detection is the likely source [inferred].
+- Fix: no lock, `idle-delay=0`, no idle dim, never sleep. Applied as user
+  gsettings and as a system dconf db (`scripts/tablet-tune.sh`). Right after:
+  DPMS `On`, `bl_power=0` [verified]. Backlight was at 1/7, set to 6 by hand
+  (sysfs, not persisted).
+- The earlier "screen dark after boot" reports: same cause probable, not
+  proven per boot [inferred].

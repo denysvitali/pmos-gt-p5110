@@ -26,4 +26,24 @@ if ! grep -q '^AutomaticLoginEnable=True' "$conf"; then
 fi
 grep -q '^AutomaticLogin=user$' "$conf" || { echo "ERROR: autologin not set" >&2; exit 1; }
 
+# Kiosk display: no lock, no idle blank/dim. A locked GNOME Mobile re-blanks
+# 10 s after every wake, which looked like "screen never turns on".
+mkdir -p /etc/dconf/profile /etc/dconf/db/local.d
+[ -e /etc/dconf/profile/user ] || printf 'user-db:user\nsystem-db:local\n' > /etc/dconf/profile/user
+grep -q '^system-db:local$' /etc/dconf/profile/user || { echo "ERROR: dconf profile lacks system-db:local" >&2; exit 1; }
+cat > /etc/dconf/db/local.d/90-pmos-galaxy-kiosk <<'KIOSK'
+[org/gnome/desktop/session]
+idle-delay=uint32 0
+
+[org/gnome/desktop/screensaver]
+lock-enabled=false
+idle-activation-enabled=false
+
+[org/gnome/settings-daemon/plugins/power]
+idle-dim=false
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-type='nothing'
+KIOSK
+dconf update
+
 echo "OK: max freq $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz; autologin set (applies on next gdm start)"
