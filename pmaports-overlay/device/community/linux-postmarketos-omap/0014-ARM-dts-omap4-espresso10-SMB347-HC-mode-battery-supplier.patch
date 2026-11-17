@@ -1,0 +1,33 @@
+From: Denys Vitali <denys@denv.it>
+Subject: [PATCH] ARM: dts: omap4: espresso10: SMB347 HC mode, battery supplier
+
+Select USB high-current mode at 900 mA; the NV default (USB5, 500 mA) does
+not cover the system load. 1.8 A trips the over-current limit of a
+Raspberry Pi 4 host port. Link the fuel gauge to the charger, so that the
+battery status is no longer "Unknown".
+---
+--- a/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso10.dts	2026-11-17 06:59:11.869999899 +0000
++++ b/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso10.dts	2026-11-17 07:01:06.672504061 +0000
+@@ -17,7 +17,21 @@
+ 			summit,enable-usb-charging;
+ 			summit,enable-charge-control = <SMB3XX_CHG_ENABLE_SW>;
+ 			summit,chip-temperature-threshold-celsius = <120>;
+-			summit,usb-current-limit-microamp = <1800000>;
++			/*
++			 * HC mode as the vendor kernel uses for its charger.
++			 * Without it the chip stays in USB5 (500 mA), which
++			 * does not cover the system load. 900 mA, not 1.8 A:
++			 * 1.8 A trips the over-current limit of common USB
++			 * host ports (seen on a Raspberry Pi 4).
++			 */
++			summit,usb-hc-mode;
++			summit,usb-current-limit-microamp = <900000>;
++		};
++	};
++
++	i2c-gpio7 {
++		fuel-gauge@36 {
++			power-supplies = <&smb347>;
+ 		};
+ 	};
+ 

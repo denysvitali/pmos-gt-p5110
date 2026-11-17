@@ -229,3 +229,21 @@ autologin, 1 d 15 h uptime [verified].
   HC selection by cable type through the P30 extcon from overlay 0007/0008),
   so the 900 mA Pi-port cap is not also applied on a 2 A wall charger
   [inferred design, not built].
+- Kernel fix staged for 7.1.5 (pkgrel 51), not yet built or booted:
+  `0013` smb347: accept -ENOENT from battery info; opt-in `summit,usb-hc-mode`
+  (clears CFG_PIN USB-mode-by-pin bits 4:3, writes `CMD_B=0x03`); `CMD_B` made
+  regmap-volatile and checked every 5 s; on a reload of the NV defaults, drop
+  the regcache and re-run hw_init plus the IRQ setup. Also found by reading the
+  source: the config registers are cached (`REGCACHE_MAPLE`), so without the
+  cache drop, re-init writes after a reload would be skipped [verified,
+  source]. `0014` espresso10 DT: `summit,usb-hc-mode`, 900 mA limit, and
+  `power-supplies = <&smb347>` on the fuel gauge (max17042 reports "Unknown"
+  when `power_supply_am_i_supplied()` fails) [verified, source]. Both patches
+  apply to v7.1.5 and reproduce the edited files exactly [verified]. Compiled:
+  not yet.
+- When the kernel driver binds, `espresso-charger` exits (it checks
+  `/sys/bus/i2c/devices/4-0006/driver`) [verified, script].
+- Load test with HC at 900 mA, gdm stopped: idle +346 mA, `stress-ng --cpu 2`
+  -100 mA, the same with `CPUQuota=100%` +155 mA [verified]. The runner unit now
+  has `CPUQuota=100%` and refuses to start below 30 % (ExecCondition). Transient
+  units `gdm-at-30` and `runner-at-30` restart GNOME and the runner at 30 %.

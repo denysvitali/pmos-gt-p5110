@@ -2,7 +2,7 @@
 maintainer="Mithil Bavishi <bavishimithil@gmail.com>"
 pkgname=linux-postmarketos-omap
 pkgver=7.1.5
-pkgrel=50
+pkgrel=51
 pkgdesc="Mainline kernel fork for OMAP devices (pmos-galaxy: + openpvrsgx DDK 1.17)"
 arch="armv7"
 url="https://kernel.org/"
@@ -57,6 +57,8 @@ source="
 	0010-usb-phy-twl6030-add-extcon-and-external-VBUS-support.patch
 	0011-ARM-dts-omap4-espresso-add-USB-OTG-support.patch
 	0012-ARM-dts-omap4-espresso-reserve-secure-RAM.patch
+	0013-power-supply-smb347-probe-without-battery-info-add-USB-HC-mode.patch
+	0014-ARM-dts-omap4-espresso10-SMB347-HC-mode-battery-supplier.patch
 	pvrsgx-1.17.patch.xz
 "
 builddir="$srcdir/linux-$_kernver"
@@ -102,5 +104,7 @@ ccde740a45a90037739e14b64215c5ffbad5c23572b98baf8d85c6b1aa598ca79abfab5d980cbe9b
 c4db84620e6fb4e7f279ab0d82493400d06e8bf3195c2e30196b9f7421166fa804d54a59a8f6030ce4ae7e8d2432ee08dd19e6de915436f0f7e8ebe1f4ce1de4  0010-usb-phy-twl6030-add-extcon-and-external-VBUS-support.patch
 1100e084f4058bdaaf5b193b3b316f76fb55ddde9c4d5091a133db96468df438de8f0afe2d3127745c2896bf52f63af8d59522c9512bc992aa5e3194cfe2489f  0011-ARM-dts-omap4-espresso-add-USB-OTG-support.patch
 0deadf1795671cb4b00c87eed7c734e0a5a15da1dd81f847f4b74133aec959fc40663de6f4cea709ed2281b31ebd0a7c2062ce70140eb9cfea0adaa581f0afa4  0012-ARM-dts-omap4-espresso-reserve-secure-RAM.patch
+4588aa4d930b41f83a771d478d1f1d0e116ae653e4cfe8cad3400f21b7fafe1e90e2aa729ab3b47d18b0488b13d6e537dcbaf85ee1b62bcc768676c1cbd9dc61  0013-power-supply-smb347-probe-without-battery-info-add-USB-HC-mode.patch
+0fcee5f937e54cc67b0b5a172fd4ce3ceae83f0b3e6f6632e7cddeeb50057dcd71578ed9599bea1359fada0368329f20f8e1058d71a300c50d1d84c0ad9c6f58  0014-ARM-dts-omap4-espresso10-SMB347-HC-mode-battery-supplier.patch
 ab933538348f7adc2ebe1af94bdca4deba8edbe93c4c20ca9d7ca501584b709953a0d52747c28e535e4a68b53388a7174e4690aabaef322e3fb9f4cbe8959efb  pvrsgx-1.17.patch.xz
 "
