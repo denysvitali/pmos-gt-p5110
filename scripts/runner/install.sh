@@ -18,7 +18,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 if [ ! -x "$root/usr/bin/python3" ]; then
 	apk add -q debootstrap debian-archive-keyring
 	debootstrap --arch=armhf --variant=minbase \
-		--include=git,python3,sudo,curl,ca-certificates,shellcheck,xz-utils,openssl,procps,kmod,libicu72,libssl3,liblttng-ust1,libkrb5-3,zlib1g \
+		--include=git,python3,sudo,curl,ca-certificates,shellcheck,xz-utils,openssl,procps,kmod,kpartx,libicu72,libssl3,liblttng-ust1,libkrb5-3,zlib1g \
 		bookworm "$root" http://deb.debian.org/debian
 fi
 grep -q '^VERSION_CODENAME=bookworm$' "$root/etc/os-release" ||
@@ -34,6 +34,10 @@ in_root id runner >/dev/null 2>&1 || in_root useradd -m -s /bin/bash runner
 echo 'runner ALL=(ALL) NOPASSWD: ALL' > "$root/etc/sudoers.d/90-runner"
 chmod 440 "$root/etc/sudoers.d/90-runner"
 cp /etc/resolv.conf "$root/etc/resolv.conf"
+# sudo warns on stderr when the host name does not resolve, which breaks
+# pmbootstrap parsing `sudo losetup --json` output.
+grep -q "[[:space:]]$(hostname)\$" "$root/etc/hosts" ||
+	printf '127.0.1.1\t%s\n' "$(hostname)" >> "$root/etc/hosts"
 
 dir=/home/runner/actions-runner
 tarball=actions-runner-linux-arm-$version.tar.gz

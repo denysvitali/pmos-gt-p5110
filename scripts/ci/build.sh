@@ -37,6 +37,11 @@ fetch() {
 mkdir -p "$work" "$out"
 fetch pmbootstrap
 fetch pmaports
+# pmbootstrap reads channels.cfg from <remote>/main, where <remote> must point
+# at the official URL; our pin comes from a mirror. Fake both, at the pin.
+git -C "$work/pmaports" remote add origin https://gitlab.postmarketos.org/postmarketOS/pmaports.git
+git -C "$work/pmaports" update-ref refs/remotes/origin/main "$(pin pmaports commit)"
+git -C "$work/pmaports" checkout -q -B main
 
 if [ -d "$root/pmaports-overlay" ]; then
 	cp -a "$root/pmaports-overlay/." "$work/pmaports/"

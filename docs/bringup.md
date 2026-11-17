@@ -177,3 +177,25 @@ autologin, 1 d 15 h uptime [verified].
   power save off (NM `wifi.powersave=2`): deb.debian.org 3.95 MB/s, and the
   pmaports fetch succeeded in 39 s [verified]. Persisted in
   `scripts/tablet-tune.sh` (NM conf.d).
+- Manual `build.sh` runs on the tablet (same env as CI) then hit, in order:
+  invalid `git commit -A` (fixed); pmbootstrap wanting an `origin` remote with
+  the official pmaports URL and `origin/main` (faked at the pin in build.sh);
+  `sudo: unable to resolve host` on stderr corrupting `losetup --json`
+  (hostname added to the chroot's /etc/hosts); missing `kpartx` (added)
+  [verified]. pmbootstrap's `detach_all` only detaches loops backed under its
+  work dir. The tablet's own root is `/dev/loop0` on `/dev/mmcblk1p10`, outside
+  it [verified, pmb/install/losetup.py].
+
+## B5 — battery ran flat during the build, 2026-11-17
+
+- ~28 min into the native build the tablet lost power: the journal of boot -1
+  ends at 03:08:44 with no shutdown or panic. The Pi then saw the OMAP4430 boot
+  ROM re-enumerate every ~6 s for ~3.5 min before pmOS came back [verified,
+  journal + Pi dmesg]. Root cause power loss [inferred].
+- After boot: 6 %, 3.39 V, `status=Unknown`. There is no charger power_supply
+  (`smb347` probe -2). On the Pi's USB port the tablet is net discharging:
+  idle about -20 to -45 mA, spikes to -350/-509 mA. Backlight off made no
+  measurable difference [verified, max170xx sysfs].
+- The Pi's USB port cannot sustain the tablet, let alone a build. The runner
+  is disabled (`systemctl disable --now actions-runner`) until the tablet is on
+  a wall charger. AGENTS.md's 30 % floor applies before any build or flash.
