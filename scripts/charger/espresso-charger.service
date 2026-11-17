@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep espresso SMB347 charger in high-current mode
+
+[Service]
+ExecStart=/usr/local/sbin/espresso-charger
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

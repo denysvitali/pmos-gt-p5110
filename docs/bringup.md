@@ -199,3 +199,33 @@ autologin, 1 d 15 h uptime [verified].
 - The Pi's USB port cannot sustain the tablet, let alone a build. The runner
   is disabled (`systemctl disable --now actions-runner`) until the tablet is on
   a wall charger. AGENTS.md's 30 % floor applies before any build or flash.
+
+## B6 — charger: SMB347 stuck in USB mode; fixed from userspace, 2026-11-17
+
+- `smb347` (module) fails probe with -2: `power_supply_get_battery_info()`
+  returns -ENOENT from `fwnode_find_reference("monitored-battery")`, and
+  `smb347_get_battery_info()` only tolerates -ENXIO/-ENODEV. The espresso DT has
+  no battery node [verified, mainline source + running DT].
+- Even when bound, mainline smb347 never writes `CMD_B` (USB1/USB5/HC) or the
+  "USB mode by register" bit in `CFG_PIN`. The stock driver
+  (cm-10.2 `drivers/power/smb347_charger.c`) does both: `CFG_PIN=0x60`, and
+  `CMD_B=0x03` (HC) for a wall charger, `0x02` (USB5) for USB, `0x00` (USB1)
+  otherwise [verified, source].
+- Registers left by the bootloader: `CMD_B=0x02` (USB5, 500 mA),
+  `STAT_C=0x05` (fast charge), net battery -35 mA on the Pi 4 port. Changing
+  the input limit (0x01) in USB5 mode: no effect [verified]. HC mode with a
+  1.8 A limit: +580 mA, then the Pi 4 logged `over-current change` and cut
+  VBUS. The chip then reloaded its OTP defaults (`CFG_PIN=0x78`: mode by pin,
+  `CMD_A=0x00`), and `CMD_B` writes no longer took effect [verified].
+- Stock-like `CFG_PIN=0x60` + HC + 900 mA limit (0x63): +330 mA for 3 min,
+  3.22 V -> 3.31 V, no over-current [verified].
+- `scripts/charger/espresso-charger.sh` (systemd `espresso-charger`, installed
+  by `tablet-tune.sh`) re-applies that every 5 s when lost, and exits if a kernel
+  driver binds the chip. Positive control: a forced `CMD_B=0x02` was restored
+  to 0x03 within 8 s [verified].
+- gdm was stopped at 5 % / 3.15 V to cut load; restart it once the battery is
+  above 30 %.
+- Still open: a kernel fix (accept -ENOENT, or add a `simple-battery` node, plus
+  HC selection by cable type through the P30 extcon from overlay 0007/0008),
+  so the 900 mA Pi-port cap is not also applied on a 2 A wall charger
+  [inferred design, not built].

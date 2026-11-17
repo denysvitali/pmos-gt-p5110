@@ -51,4 +51,13 @@ dconf update
 mkdir -p /etc/NetworkManager/conf.d
 printf '[connection]\nwifi.powersave=2\n' > /etc/NetworkManager/conf.d/90-pmos-galaxy-wifi-powersave.conf
 
+# Charger: keep the SMB347 in high-current mode (docs/bringup.md B6).
+here=$(cd "$(dirname "$0")" && pwd)
+apk add -q i2c-tools
+install -D -m 755 "$here/charger/espresso-charger.sh" /usr/local/sbin/espresso-charger
+install -m 644 "$here/charger/espresso-charger.service" /etc/systemd/system/espresso-charger.service
+systemctl daemon-reload
+systemctl enable --now espresso-charger.service
+systemctl is-active -q espresso-charger.service || { echo "ERROR: espresso-charger not running" >&2; exit 1; }
+
 echo "OK: max freq $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz; autologin set (applies on next gdm start)"
