@@ -170,3 +170,10 @@ autologin, 1 d 15 h uptime [verified].
   ARM32 runners are no longer supported` [verified, Worker _diag log]. The
   workflow now uses only shell steps (git checkout with the job token).
   Outputs stay on the tablet in `/srv/runner-debian/home/runner/out/<sha>`.
+- First image job failed in 7 min with git exit 128: the pmaports fetch gave
+  `early EOF` after 540 s on the tablet; the Pi fetched the same commit in 20 s
+  [verified]. Throughput, same chroot curl: USB to the Pi 5.9 MB/s,
+  deb.debian.org over Wi-Fi 64 KB/s, Wi-Fi signal 70 % [verified]. With Wi-Fi
+  power save off (NM `wifi.powersave=2`): deb.debian.org 3.95 MB/s, and the
+  pmaports fetch succeeded in 39 s [verified]. Persisted in
+  `scripts/tablet-tune.sh` (NM conf.d).

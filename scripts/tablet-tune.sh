@@ -46,4 +46,9 @@ sleep-inactive-battery-type='nothing'
 KIOSK
 dconf update
 
+# brcmfmac with Wi-Fi power save on: ~64 KB/s to the internet; off: ~4 MB/s
+# (docs/bringup.md B4). 2 = disable.
+mkdir -p /etc/NetworkManager/conf.d
+printf '[connection]\nwifi.powersave=2\n' > /etc/NetworkManager/conf.d/90-pmos-galaxy-wifi-powersave.conf
+
 echo "OK: max freq $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz; autologin set (applies on next gdm start)"
