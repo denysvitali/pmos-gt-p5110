@@ -40,8 +40,9 @@ fetch pmaports
 
 if [ -d "$root/pmaports-overlay" ]; then
 	cp -a "$root/pmaports-overlay/." "$work/pmaports/"
+	git -C "$work/pmaports" add -A
 	git -C "$work/pmaports" -c user.name=ci -c user.email=ci@localhost \
-		commit -q -A --allow-empty -m "pmos-galaxy overlay"
+		commit -q --allow-empty -m "pmos-galaxy overlay"
 	echo "overlay applied:"
 	git -C "$work/pmaports" show --stat --format= HEAD
 fi

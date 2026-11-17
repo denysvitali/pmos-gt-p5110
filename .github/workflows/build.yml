@@ -52,4 +52,9 @@ jobs:
           PMOS_PASSWORD: ${{ secrets.PMOS_PASSWORD || '147147' }}
           PMOS_UI: ${{ inputs.ui || 'console' }}
           PMOS_FORCE_BUILD: ${{ inputs.force_build || 'linux-postmarketos-omap' }}
-        run: scripts/ci/build.sh "$HOME/pmos-work" "$HOME/out/$GITHUB_SHA"
+        # The step log is also kept on the tablet: GitHub's copy is not readable there.
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$HOME/out"
+          scripts/ci/build.sh "$HOME/pmos-work" "$HOME/out/$GITHUB_SHA" 2>&1 | tee "$HOME/out/$GITHUB_SHA.log"
