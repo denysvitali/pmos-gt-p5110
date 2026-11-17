@@ -26,6 +26,8 @@ grep -q '^VERSION_CODENAME=bookworm$' "$root/etc/os-release" ||
 
 install -D -m 755 "$here/chroot-mounts.sh" /usr/local/sbin/runner-chroot-mounts
 install -m 644 "$here/actions-runner.service" /etc/systemd/system/actions-runner.service
+install -m 755 "$here/battery-quota.sh" /usr/local/sbin/runner-battery-quota
+install -m 644 "$here/battery-quota.service" /etc/systemd/system/runner-battery-quota.service
 /usr/local/sbin/runner-chroot-mounts up
 
 in_root() { chroot "$root" "$@"; }
@@ -56,6 +58,6 @@ fi
 [ -e "$root$dir/.runner" ] || { echo "ERROR: runner not configured" >&2; exit 1; }
 
 systemctl daemon-reload
-systemctl enable --now actions-runner.service
+systemctl enable --now actions-runner.service runner-battery-quota.service
 sleep 5
 systemctl is-active actions-runner.service

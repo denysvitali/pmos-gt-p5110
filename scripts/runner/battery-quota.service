@@ -1,0 +1,10 @@
+[Unit]
+Description=Size the Actions runner CPU quota by battery level
+
+[Service]
+ExecStart=/usr/local/sbin/runner-battery-quota
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

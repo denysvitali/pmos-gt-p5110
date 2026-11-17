@@ -247,3 +247,9 @@ autologin, 1 d 15 h uptime [verified].
   -100 mA, the same with `CPUQuota=100%` +155 mA [verified]. The runner unit now
   has `CPUQuota=100%` and refuses to start below 30 % (ExecCondition). Transient
   units `gdm-at-30` and `runner-at-30` restart GNOME and the runner at 30 %.
+- Build of 647a00e started at 12:31 once the battery reached 30 % (runner-at-30
+  fired, GNOME back). With one core the compile manages ~2 objects/min, which
+  is at risk of the 720-min job timeout. `runner-battery-quota` (installer:
+  `scripts/runner/install.sh`) sets the runner to 2 cores at >=50 % and 1 core
+  below 40 %, stops it below 20 %, and starts it again at >=30 %. Verified at
+  30 %: CPUQuota=100 %, running job untouched. The 50 % branch is untested.
