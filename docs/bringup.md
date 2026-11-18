@@ -261,3 +261,9 @@ autologin, 1 d 15 h uptime [verified].
 - 0013 compiles: `drivers/power/supply/smb347-charger.o` built on the tablet
   (GCC 15.2, 7.1.5), with no warnings or errors in the log for it
   [verified]. Behaviour on the device: untested.
+- Build of 647a00e failed after ~23 h at modpost:
+  `"__vmalloc_node_range_noprof" [.../pvrsrvkm_omap4_sgx540_120.ko] undefined`,
+  and the same for sgx544 [verified, log]. The openpvrsgx tree exports it in
+  mm/vmalloc.c (c9c94731, line 4104), but `pvrsgx-1.17.patch.xz` only
+  carries the driver directory [verified]. Fix: `0015` adds the export
+  (pkgrel 52). Everything before modpost, including smb347, compiled.

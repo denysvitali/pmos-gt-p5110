@@ -1,0 +1,17 @@
+From: Denys Vitali <denys@denv.it>
+Subject: [PATCH] mm: vmalloc: export __vmalloc_node_range_noprof for pvrsgx
+
+The openpvrsgx tree (pvrsrvkm-7.1) carries this export. pvrsgx-1.17.patch.xz
+only has drivers/gpu/drm/pvrsgx, so the modules fail modpost:
+"__vmalloc_node_range_noprof" [...pvrsrvkm_omap4_sgx540_120.ko] undefined.
+---
+--- a/mm/vmalloc.c	2026-11-18 11:13:14.075196871 +0000
++++ b/mm/vmalloc.c	2026-11-18 11:13:14.111196397 +0000
+@@ -4101,6 +4101,7 @@
+ 
+ 	return NULL;
+ }
++EXPORT_SYMBOL(__vmalloc_node_range_noprof);
+ 
+ /**
+  * __vmalloc_node - allocate virtually contiguous memory
