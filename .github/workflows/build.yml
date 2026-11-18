@@ -45,3 +45,31 @@ jobs:
           name: packages-${{ github.sha }}
           path: out/
           compression-level: 0
+
+  # Publish the packages, so the tablet can fetch them without a token
+  # (artifact downloads need one even on a public repository). A separate
+  # job so that only it, not the build, holds a write token.
+  release:
+    needs: packages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages-${{ github.sha }}
+          path: out
+
+      - name: Publish prerelease packages-<sha>
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="packages-${GITHUB_SHA::12}"
+          (cd out && sha256sum -c SHA256SUMS)
+          gh release create "$tag" out/packages/*.apk out/SHA256SUMS \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "$tag" \
+            --notes "Packages built from $GITHUB_SHA by run $GITHUB_RUN_ID. Untested on hardware unless docs/bringup.md says otherwise."
