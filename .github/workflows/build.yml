@@ -20,7 +20,7 @@ jobs:
   lint:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: shellcheck scripts/ci/*.sh scripts/runner/*.sh scripts/charger/*.sh
       - run: python3 -m json.tool sources.lock.json > /dev/null
 
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Host tools
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends kpartx
@@ -40,7 +40,7 @@ jobs:
           PMOS_FORCE_BUILD: ${{ inputs.force_build || 'linux-postmarketos-omap' }}
         run: scripts/ci/build.sh "$RUNNER_TEMP/work" out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: packages-${{ github.sha }}
           path: out/
