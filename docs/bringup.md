@@ -275,3 +275,16 @@ autologin, 1 d 15 h uptime [verified].
   on GitHub-hosted `ubuntu-24.04`: the kernel is `pmb:cross-native` (x86_64
   chroot with an armv7 cross toolchain), `PMOS_SKIP_INSTALL=1` builds packages
   only, and the result is uploaded as the `packages-<sha>` artifact.
+- Hosted builds: f2dc7dc in 23 min, 20e3a85 (actions v7) and da9edd7
+  passed. Release `packages-da9edd779701`:
+  `linux-postmarketos-omap-7.1.5-r52.apk` (sha256 OK on the tablet). Contents
+  [verified, extracted + `dtc -I dtb`]: `smb347-charger.ko` carries
+  `summit,usb-hc-mode` and the re-init messages; `pvrsrvkm_omap4_sgx540_120.ko`
+  present; espresso10 DTB has `summit,usb-hc-mode`, limit 0xdbba0 (900 mA), the
+  fuel gauge `power-supplies` = charger phandle 0xb0, and the secure-input /
+  SMC no-map reservations. Not booted.
+- Rollback facts: KERNEL (mmcblk1p5) = `kernel-part-705-dtfix.img`
+  (sha256 ae4817a1…), RECOVERY (mmcblk1p6) = the 2026-11-03 CWM backup
+  (6f43b8d1…) [verified]. Upgrading the package replaces
+  `/usr/lib/modules/7.0.5`, so restoring KERNEL alone would boot 7.0.5
+  without its modules [inferred from packaging].
