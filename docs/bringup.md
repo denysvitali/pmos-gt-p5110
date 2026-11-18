@@ -253,3 +253,8 @@ autologin, 1 d 15 h uptime [verified].
   `scripts/runner/install.sh`) sets the runner to 2 cores at >=50 % and 1 core
   below 40 %, stops it below 20 %, and starts it again at >=30 %. Verified at
   30 %: CPUQuota=100 %, running job untouched. The 50 % branch is untested.
+- `Runner.Worker` died with SIGSEGV (systemd-coredump) at 12:36, 5 min into
+  the image job; the build itself continued orphaned and is still compiling
+  18 h later (`drivers/net` at 06:37) [verified]. Cause of the segfault unknown
+  (not OOM) [verified: no OOM in dmesg]. The GitHub job result is therefore
+  meaningless for this run; outputs still land in `out/<sha>`.
