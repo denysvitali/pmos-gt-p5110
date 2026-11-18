@@ -258,3 +258,6 @@ autologin, 1 d 15 h uptime [verified].
   18 h later (`drivers/net` at 06:37) [verified]. Cause of the segfault unknown
   (not OOM) [verified: no OOM in dmesg]. The GitHub job result is therefore
   meaningless for this run; outputs still land in `out/<sha>`.
+- 0013 compiles: `drivers/power/supply/smb347-charger.o` built on the tablet
+  (GCC 15.2, 7.1.5), with no warnings or errors in the log for it
+  [verified]. Behaviour on the device: untested.
