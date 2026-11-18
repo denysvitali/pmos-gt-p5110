@@ -1,60 +1,47 @@
 name: build
 
-# The only runner is the tablet (armv7). The runner refuses JavaScript actions
-# on ARM32 ("Linux ARM32 runners are no longer supported"), so every step is a
-# plain shell step: no actions/checkout, no upload-artifact. Outputs stay on the
-# tablet under /home/runner/out/<sha> (inside the runner chroot).
+# GitHub-hosted runners only: the repository is public, and a self-hosted
+# runner would let pull requests run code on the tablet. The kernel is
+# cross-compiled (pmb:cross-native) in pmbootstrap's x86_64 native chroot.
+# No pull_request trigger on purpose.
 
 on:
   push:
   workflow_dispatch:
     inputs:
-      ui:
-        description: pmOS UI package (console, weston, ...)
-        default: console
       force_build:
         description: Packages to rebuild from source (space-separated)
         default: linux-postmarketos-omap
 
-env:
-  CHECKOUT: |
-    set -eu
-    git init -q .
-    git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
-      fetch -q --depth 1 "https://github.com/$GITHUB_REPOSITORY" "$GITHUB_SHA"
-    git checkout -q --force FETCH_HEAD
-    test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+permissions:
+  contents: read
 
 jobs:
   lint:
-    runs-on: [self-hosted, linux, pmos-gt-p5110]
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: sh -c "$CHECKOUT"
-      - run: shellcheck scripts/ci/*.sh scripts/runner/*.sh
+      - uses: actions/checkout@v4
+      - run: shellcheck scripts/ci/*.sh scripts/runner/*.sh scripts/charger/*.sh
       - run: python3 -m json.tool sources.lock.json > /dev/null
 
-  image:
+  packages:
     needs: lint
-    runs-on: [self-hosted, linux, pmos-gt-p5110]
-    timeout-minutes: 720
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
     steps:
-      - name: Checkout
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: sh -c "$CHECKOUT"
+      - uses: actions/checkout@v4
 
-      - name: Build image
+      - name: Host tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends kpartx
+
+      - name: Build packages
         env:
-          # Dev images only: set the PMOS_PASSWORD secret before sharing builds.
-          PMOS_PASSWORD: ${{ secrets.PMOS_PASSWORD || '147147' }}
-          PMOS_UI: ${{ inputs.ui || 'console' }}
+          PMOS_SKIP_INSTALL: 1
           PMOS_FORCE_BUILD: ${{ inputs.force_build || 'linux-postmarketos-omap' }}
-        # The step log is also kept on the tablet: GitHub's copy is not readable there.
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p "$HOME/out"
-          scripts/ci/build.sh "$HOME/pmos-work" "$HOME/out/$GITHUB_SHA" 2>&1 | tee "$HOME/out/$GITHUB_SHA.log"
+        run: scripts/ci/build.sh "$RUNNER_TEMP/work" out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ github.sha }}
+          path: out/
+          compression-level: 0

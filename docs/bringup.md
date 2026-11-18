@@ -267,3 +267,11 @@ autologin, 1 d 15 h uptime [verified].
   mm/vmalloc.c (c9c94731, line 4104), but `pvrsgx-1.17.patch.xz` only
   carries the driver directory [verified]. Fix: `0015` adds the export
   (pkgrel 52). Everything before modpost, including smb347, compiled.
+
+## B7 — repository public, hosted builds, 2026-11-18
+
+- The repository went public. The tablet runner (`actions-runner`,
+  `runner-battery-quota`) is stopped and disabled on the device. CI now runs
+  on GitHub-hosted `ubuntu-24.04`: the kernel is `pmb:cross-native` (x86_64
+  chroot with an armv7 cross toolchain), `PMOS_SKIP_INSTALL=1` builds packages
+  only, and the result is uploaded as the `packages-<sha>` artifact.

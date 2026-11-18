@@ -3,13 +3,15 @@
 # sources.lock.json, with pmaports-overlay/ copied over pmaports.
 # Usage: build.sh <workdir> <outdir>
 # Env: PMOS_PASSWORD (required), PMOS_UI (default: console),
-#      PMOS_FORCE_BUILD (space-separated packages to rebuild from source)
+#      PMOS_FORCE_BUILD (space-separated packages to rebuild from source),
+#      PMOS_SKIP_INSTALL=1 (packages only, no image)
 set -eu
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 work=${1:?usage: build.sh <workdir> <outdir>}
 out=${2:?usage: build.sh <workdir> <outdir>}
-: "${PMOS_PASSWORD:?PMOS_PASSWORD must be set}"
+skip_install=${PMOS_SKIP_INSTALL:-0}
+[ "$skip_install" = 1 ] || : "${PMOS_PASSWORD:?PMOS_PASSWORD must be set}"
 ui=${PMOS_UI:-console}
 device=samsung-espresso10
 
@@ -67,7 +69,9 @@ for pkg in ${PMOS_FORCE_BUILD:-}; do
 	pmb build --force --arch armv7 "$pkg"
 done
 
-pmb install --password "$PMOS_PASSWORD"
+if [ "$skip_install" != 1 ]; then
+	pmb install --password "$PMOS_PASSWORD"
+fi
 
 # Packages we built, so a kernel can be installed into an existing system.
 pkgs=$(pmb config work)/packages
@@ -79,6 +83,11 @@ for pkg in ${PMOS_FORCE_BUILD:-}; do
 		exit 1
 	fi
 done
+
+if [ "$skip_install" = 1 ]; then
+	(cd "$out" && sha256sum packages/*.apk > SHA256SUMS && cat SHA256SUMS)
+	exit 0
+fi
 
 exp="$work/export"
 rm -rf "$exp"
