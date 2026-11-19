@@ -59,6 +59,12 @@ pmb() {
 		--details-to-stdout -y "$@"
 }
 
+# Keep pmbootstrap's own log for CI (it holds the failing command's output).
+save_pmb_log() {
+	cp "$(pmb config work 2>/dev/null)/log.txt" "$work/pmbootstrap-log.txt" 2>/dev/null || true
+}
+trap save_pmb_log EXIT
+
 yes '' | "$work/pmbootstrap/pmbootstrap.py" --aports "$work/pmaports" \
 	--details-to-stdout init
 pmb config device "$device"

@@ -38,13 +38,26 @@ jobs:
         env:
           PMOS_SKIP_INSTALL: 1
           INPUT_FORCE_BUILD: ${{ inputs.force_build }}
+        shell: bash
         run: |
-          set -eu
+          set -euo pipefail
           PMOS_FORCE_BUILD=${INPUT_FORCE_BUILD:-$(grep -v '^#' ci-packages.txt | xargs)}
           [ -n "$PMOS_FORCE_BUILD" ] || { echo "ERROR: nothing to build" >&2; exit 1; }
           echo "building: $PMOS_FORCE_BUILD"
           export PMOS_FORCE_BUILD
-          scripts/ci/build.sh "$RUNNER_TEMP/work" out
+          mkdir -p out
+          scripts/ci/build.sh "$RUNNER_TEMP/work" out 2>&1 | tee out/build.log
+
+      # Job logs need a token even on a public repository; the log goes out
+      # through the release jobs below instead.
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: log-${{ github.sha }}
+          path: |
+            out/build.log
+            ${{ runner.temp }}/work/pmbootstrap-log.txt
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v7
         with:
@@ -79,3 +92,26 @@ jobs:
             --target "$GITHUB_SHA" --prerelease \
             --title "$tag" \
             --notes "Packages built from $GITHUB_SHA by run $GITHUB_RUN_ID. Untested on hardware unless docs/bringup.md says otherwise."
+
+  # Publish the build log of a failed push to main, readable without a token.
+  failure-log:
+    needs: packages
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: log-${{ github.sha }}
+          path: log
+      - name: Publish prerelease ci-log-<sha>
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag="ci-log-${GITHUB_SHA::12}"
+          find log -type f
+          gh release create "$tag" $(find log -type f) --target "$GITHUB_SHA" \
+            --prerelease --title "$tag" --notes "Build log of failed run $GITHUB_RUN_ID."
