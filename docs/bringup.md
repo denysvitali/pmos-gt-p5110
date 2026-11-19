@@ -443,3 +443,18 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   `pmb config service_manager openrc`, so no systemd is pulled into the buildroot.
   Built objects link libudev.so.1 etc. by soname, which should run on the
   systemd device [inferred, to be checked on device]. Images stay systemd.
+- Userspace built (fa154a4, 8 min): release `packages-fa154a42c1a5` with
+  mesa-pvr-dri-classic 21.3.9-r51, sgx-ddk-um 1.17.4948957-r50 (+ti443x).
+  Runtime deps are sonames only (no eudev by name); sgx-ddk-um needs gcompat
+  [verified, .PKGINFO].
+- Installed on the tablet (`apk add --allow-untrusted`, one transaction): mesa,
+  mesa-{gl,egl,gles,dri-gallium,gbm} 26.1.6 removed, mesa-pvr + gcompat + sgx-ddk-um(+ti443x)
+  installed, llvm22-libs/spirv-tools dropped. Prior package set:
+  /var/backup/r53/apk-installed-before-pvr.txt. Rollback: `apk add mesa
+  mesa-egl mesa-gl mesa-gles mesa-dri-gallium mesa-gbm` from the repo.
+- `pvrsrvinit`: `PVR_K: UM DDK-(4948957) and KM DDK-(4948957) match. [ OK ]`;
+  the unit is enabled through its preset [verified].
+- **GLES on the SGX540** [verified]: `eglinfo -p gbm` → EGL vendor "Mesa Project
+  (Amber)", GLES vendor Imagination Technologies, renderer **PowerVR SGX 540**,
+  "OpenGL ES 2.0 build 1.17@4948957". This was before any compositor used it;
+  GNOME still ran on the old (deleted, still mapped) mesa 26 libraries.
