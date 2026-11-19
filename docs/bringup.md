@@ -555,8 +555,17 @@ clients broken, GTK clients software-rendered.
   then adds MODIFIER_LO/HI [verified, mutter 48.0 source]. Mesa 21.3
   `dri2_create_image_dma_buf` routes any present modifier to
   createImageFromDmaBufs2, which fails on pvr [verified, mesa-pvr source].
-- Fix: mesa-pvr patch: an explicit DRM_FORMAT_MOD_INVALID is treated as no
-  modifier (pkgrel 52). Untested.
+- mesa-pvr patch (r52): treat an explicit DRM_FORMAT_MOD_INVALID as no modifier.
+  Result [verified]: the import now succeeds, then **gnome-shell SIGSEGV** in the
+  closed blob: `#0 libGLESv2_PVR_MESA.so + 0x16e6c` (SEGV_MAPERR), 22:47:42,
+  during es2gears_wayland. GDM fell back to the greeter. That is worse than r51 (only
+  the client was killed), so the tablet went back to r51 and the patch was removed
+  (pkgrel 53 = r51 behaviour).
+- So EGL clients fail in two layers: mutter's explicit-modifier import (fixable)
+  and then the SGX blob crashing on the imported client texture (closed code,
+  not debuggable from here). Options: a compositor that doesn't import
+  client dmabufs into PVR GLES (e.g. shm/wl_drm path, or a weston/cage kiosk), or
+  clients that use shm (software) buffers [inferred].
 - Boot-time items, investigated, not changed:
   - Wi-Fi P2P timeout (4.6 s, Wi-Fi only): wpa_supplicant runs `-u` (D-Bus)
     with no config, `p2p_disabled` is per-interface, and NetworkManager recreates
