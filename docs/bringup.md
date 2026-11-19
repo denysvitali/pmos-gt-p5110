@@ -314,3 +314,9 @@ autologin, 1 d 15 h uptime [verified].
   RECOVERY (mmcblk1p6, was the CWM image 6f43b8d1…), readback identical.
   KERNEL still ae4817a1…, /boot unchanged [verified]. CWM can be restored
   from `scratch/backup-20261103/RECOVERY.img`.
+- Test boot of r52 from RECOVERY (09:15): the 7.0.5 system shut down
+  (USB disconnect ~2 min after the reboot). After that, nothing on USB for
+  11+ min: no pmOS gadget, no Wi-Fi [verified, Pi dmesg/ping]. Whether SBL
+  started the RECOVERY image, and where 7.1.5 stopped: not known. No console
+  (cmdline `quiet splash`, PANIC_TIMEOUT=0, no pstore). Next: the screen
+  state, then a manual power-off, then boot 7.0.5 from KERNEL.
