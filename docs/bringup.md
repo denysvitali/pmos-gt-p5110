@@ -527,3 +527,17 @@ clients broken, GTK clients software-rendered.
 - Confirmed by the user and the journal: press → `doing system action 'blank'
   (reason 'power key released')` + `_turnOffScreen()`, next press → `cancelling
   action 'blank'` + `_turnOnScreen()` [verified, 20:52].
+
+## B14 — RECOVERY as the B kernel slot, 2026-11-19
+
+- A = KERNEL (normal boot), B = RECOVERY (one-shot via the SBL reboot reason,
+  B8). B is the previous known-good kernel. `scripts/kernel-ab.sh install <apk>`
+  saves the running A image and its modules, upgrades the package (boot-deploy
+  flashes A), writes the saved image to B (readback checked), and keeps B's
+  module tree installed. `kernel-ab boot-b` boots B once.
+- That needs a unique kernel release per build, so that two module trees can
+  coexist. r56 stamps `CONFIG_LOCALVERSION="-r$pkgrel"` in prepare() (7.1.5-r56).
+  Earlier builds were all `7.1.5`, and mixing r54 kernel + r53 modules failed BTF
+  validation (B10).
+- CWM stays out of RECOVERY by user choice. Its backup is
+  scratch/backup-20261103/RECOVERY.img.

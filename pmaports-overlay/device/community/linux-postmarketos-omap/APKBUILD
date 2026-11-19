@@ -2,7 +2,7 @@
 maintainer="Mithil Bavishi <bavishimithil@gmail.com>"
 pkgname=linux-postmarketos-omap
 pkgver=7.1.5
-pkgrel=55
+pkgrel=56
 pkgdesc="Mainline kernel fork for OMAP devices (pmos-galaxy: + openpvrsgx DDK 1.17)"
 arch="armv7"
 url="https://kernel.org/"
@@ -70,6 +70,12 @@ replaces="linux-samsung-espresso3g linux-nokia-n900"
 prepare() {
 	default_prepare
 	cp -v "$srcdir"/$_config .config
+	# A unique kernel release per pkgrel (7.1.5-rN), so the previous kernel's
+	# modules can stay installed next to the new ones for the B slot
+	# (scripts/kernel-ab.sh). Modules must come from the same build (BTF).
+	grep -qx 'CONFIG_LOCALVERSION=""' .config || die "unexpected CONFIG_LOCALVERSION"
+	sed -i "s/^CONFIG_LOCALVERSION=\"\"$/CONFIG_LOCALVERSION=\"-r$pkgrel\"/" .config
+	grep -qx "CONFIG_LOCALVERSION=\"-r$pkgrel\"" .config || die "CONFIG_LOCALVERSION not set"
 	make ARCH="$_carch" olddefconfig
 }
 
