@@ -492,3 +492,23 @@ So mutter's PVR EGL rejects the dmabuf the client's PVR stack produced. GTK4 app
 (gnome-control-center) start without errors. Presumed: GTK4's GL renderer needs
 GLES ≥ 3.0 and falls back to cairo [inferred]. So: compositor accelerated, EGL
 clients broken, GTK clients software-rendered.
+
+## B13 — power button and "screen off", 2026-11-19
+
+- No power-key input device: only gpio-keys, touchscreen, vibrator
+  [verified]. `INPUT_TWL4030_PWRBUTTON=y` and the driver supports
+  `ti,twl6030-pwrbutton`, but espresso's PMIC is a TWL6032 (`twl6032.dtsi`), and
+  overlay 0003 only patched `twl6030.dtsi` [verified, DT + source].
+- Test (DTB edited with dtc, r54 kernel, RECOVERY one-shot): `twl4030_pwrbutton`
+  input0/event0 appears; presses raise its IRQ (/proc/interrupts 0→8→12)
+  [verified]. STS_HW_CONDITIONS (0x48:0x21) idles at 0x3b, so bit 0 (STS_PWRON) is 1
+  while released [verified]. The driver reports KEY_POWER = bit 0, so the key looked
+  held down whenever released. gnome-shell logged `_powerButtonEvent` ~36/s
+  (19 658 since 18:44; gnome-shell 8 % + journald 4 % CPU) [verified]. That is
+  inverted polarity [inferred from idle value + autorepeat; the pressed value was not
+  captured]. A normal reboot back to r54 stopped it (0 events).
+- Fix `0016` (pkgrel 55): `ti,twl6032-pwrbutton` compatible with active-low
+  STS_PWRON, node in twl6032.dtsi. twl6030 boards are unchanged.
+- The "dark screen" was brightness 14 % in GNOME, i.e. level 1/7 = 4/255 PWM
+  (DT brightness-levels 0 4 8 16 32 64 128 255) [verified]. Set to 80 % through
+  gsd-power (level 6/7). It persists across reboot (systemd-backlight) [verified].
