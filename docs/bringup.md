@@ -364,3 +364,11 @@ The error path WARNs in `drm_client_sysrq_unregister` (no crash). SBL's cmdline
 carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
 /proc/cmdline). A larger vmalloc= needs a kernel-side cmdline
 (CONFIG_CMDLINE_EXTEND or similar) [inferred, untested].
+- Made permanent: backups of /usr/lib/modules/7.0.5 and /boot to
+  /var/backup/k705 on the tablet (sha256 in SHA256SUMS there). Then
+  `apk add --allow-untrusted` of the r53 file (pmbootstrap's CI key is not
+  trusted on the device): 7.0.5-r2 -> 7.1.5-r53, world entry pinned by checksum.
+  boot-deploy flashed KERNEL; KERNEL == /boot/boot.img == the tested
+  RECOVERY image (sha256 a7891b82…, mkinitfs is deterministic). A normal reboot
+  from KERNEL runs 7.1.5 #54: smb347 bound, Charging, GNOME active, espresso-charger
+  exits [verified]. RECOVERY still holds the test slot (CWM backup on the Pi).
