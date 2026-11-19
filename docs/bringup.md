@@ -557,3 +557,13 @@ clients broken, GTK clients software-rendered.
   createImageFromDmaBufs2, which fails on pvr [verified, mesa-pvr source].
 - Fix: mesa-pvr patch: an explicit DRM_FORMAT_MOD_INVALID is treated as no
   modifier (pkgrel 52). Untested.
+- Boot-time items, investigated, not changed:
+  - Wi-Fi P2P timeout (4.6 s, Wi-Fi only): wpa_supplicant runs `-u` (D-Bus)
+    with no config, `p2p_disabled` is per-interface, and NetworkManager recreates
+    the interface over D-Bus, so no global switch [reported, unix.stackexchange
+    765116]. Left as known.
+  - initramfs-extra compression (2.6 s gunzip): the initramfs'
+    `extract_initramfs_extra()` hardcodes `gzip -d -c … | cpio -iu` [verified,
+    init_functions.sh]. lz4/none would halt boot. The boot.img initramfs cannot
+    grow either (7.56 of 8 MiB). Dropped.
+  - systemd-time-wait-sync (32.8 s) is not on the graphical path.
