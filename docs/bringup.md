@@ -288,3 +288,29 @@ autologin, 1 d 15 h uptime [verified].
   (6f43b8d1…) [verified]. Upgrading the package replaces
   `/usr/lib/modules/7.0.5`, so restoring KERNEL alone would boot 7.0.5
   without its modules [inferred from packaging].
+
+## B8 — one-shot test boot through RECOVERY, 2026-11-19
+
+- Mainline has no reboot-mode support for espresso (no DT node,
+  `SYSCON/NVMEM_REBOOT_MODE` off). The stock kernel (`sec_common.c`) writes
+  the reason to the SAR scratchpad: `0x4A326FF8 = REBOOTMODE_RECOVERY (0x2)`,
+  `0x4A326FF4 = "RESE"`, `0x4A326FE8 = 0x12345672`
+  [verified, source]. `scripts/samsung-reboot-mode.py recovery` sets them from
+  userspace through /dev/mem.
+- Positive control, no flash writes: after `recovery` + `systemctl reboot`, SBL
+  booted CWM from RECOVERY (`adb devices`: `c1607dbef487040 recovery`, CWM
+  kernel 3.0.31, `ro.bootmode=reboot_recovery`). `adb reboot` from CWM was back
+  in pmOS 7.0.5 within 80 s [verified]. After that boot the scratchpad held its
+  pre-test values again, so SBL rewrites them each boot (one-shot)
+  [inferred].
+- `espresso-charger` came up by itself after the reboot [verified].
+- `scripts/stage-test-kernel.sh` builds a boot image for a test kernel without
+  touching /boot, KERNEL or the installed package. mkinitfs 2.11 keeps its
+  archives only through boot-deploy (with `-no-bootdeploy` they are dropped,
+  [verified, control run]). The real boot-deploy would flash KERNEL, so a stub
+  boot-deploy first in PATH copies them out. Header parameters are copied from
+  /boot/boot.img and compared field by field.
+- r52 staged: `boot-test.img` sha256 3a5cb45b…, 7 315 456 bytes. Written to
+  RECOVERY (mmcblk1p6, was the CWM image 6f43b8d1…), readback identical.
+  KERNEL still ae4817a1…, /boot unchanged [verified]. CWM can be restored
+  from `scratch/backup-20261103/RECOVERY.img`.
