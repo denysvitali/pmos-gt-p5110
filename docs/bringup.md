@@ -512,3 +512,15 @@ clients broken, GTK clients software-rendered.
 - The "dark screen" was brightness 14 % in GNOME, i.e. level 1/7 = 4/255 PWM
   (DT brightness-levels 0 4 8 16 32 64 128 255) [verified]. Set to 80 % through
   gsd-power (level 6/7). It persists across reboot (systemd-backlight) [verified].
+- r55 installed (backup /var/backup/r54 + scratch/kernel-part/boot-r54.img).
+  Idle: pwrbutton present, 0 IRQs, 0 events. Two presses [verified]:
+  `KEY_POWER 1` with STS_HW_CONDITIONS 0x3b→0x38, `KEY_POWER 0` with 0x38→0x3b,
+  one down/up per press, no repeats. Active-low STS_PWRON is confirmed, so 0016
+  is correct.
+- The screen did not turn off because of GNOME: `POWERMANAGER: doing system action
+  'suspend' (reason 'power key released')`, and sleep targets are masked. gnome-shell
+  (GNOME Mobile) powerButtonEvent maps `power-button-action='nothing'` to
+  'blank' (phones are forced to blank; this tablet is not "isPhone") [verified, JS
+  in libshell-16.so]. Set to 'nothing' (user + dconf default in tablet-tune.sh).
+- tablet-tune.sh's charger check now accepts the bound kernel smb347 driver
+  (espresso-charger exits by design with 0013).

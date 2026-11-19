@@ -40,6 +40,10 @@ lock-enabled=false
 idle-activation-enabled=false
 
 [org/gnome/settings-daemon/plugins/power]
+# GNOME Mobile maps 'nothing' to its 'blank' action: the power key turns the
+# screen off and the next press turns it on. 'suspend' does nothing here (sleep
+# targets are masked). docs/bringup.md B13.
+power-button-action='nothing'
 idle-dim=false
 sleep-inactive-ac-type='nothing'
 sleep-inactive-battery-type='nothing'
@@ -58,6 +62,8 @@ install -D -m 755 "$here/charger/espresso-charger.sh" /usr/local/sbin/espresso-c
 install -m 644 "$here/charger/espresso-charger.service" /etc/systemd/system/espresso-charger.service
 systemctl daemon-reload
 systemctl enable --now espresso-charger.service
-systemctl is-active -q espresso-charger.service || { echo "ERROR: espresso-charger not running" >&2; exit 1; }
+# With the patched kernel (0013) the smb347 driver binds and the service exits.
+systemctl is-active -q espresso-charger.service || [ -e /sys/bus/i2c/devices/4-0006/driver ] ||
+	{ echo "ERROR: neither espresso-charger nor the smb347 driver is active" >&2; exit 1; }
 
 echo "OK: max freq $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz; autologin set (applies on next gdm start)"
