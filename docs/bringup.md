@@ -412,3 +412,14 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
 - GPU kernel side done. Userspace (sgx-ddk-um blobs, mesa-pvr-dri-classic in
   pmaports-overlay/pvr) has not been built or installed yet. GNOME still renders
   in software.
+
+## B11 — SGX userspace build
+
+- CI log channel: job logs and artifacts need a token even on a public repo, so a
+  failed push to main now publishes its build log as prerelease `ci-log-<sha>`.
+- First userspace build (240d32a/1fc98fd): `mesa-pvr-dri-classic: dependency
+  not found: libglvnd`. No libglvnd in Alpine edge main/community/testing or pmOS
+  main for armv7. Positive control: `mesa 26.3.0` found in the same parsed edge
+  main index [verified]. Fix: no libglvnd, `-Dglvnd=disabled`. The package then
+  owns libEGL/libGLES/libGL, so it provides and replaces mesa-egl, mesa-gl and
+  mesa-gles as well (pkgrel 51).

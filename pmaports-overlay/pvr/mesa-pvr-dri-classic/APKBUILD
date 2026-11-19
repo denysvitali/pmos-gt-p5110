@@ -2,7 +2,7 @@
 
 pkgname=mesa-pvr-dri-classic
 pkgver=21.3.9
-pkgrel=50
+pkgrel=51
 pkgdesc="Mesa (Amber) DRI OpenGL library with PowerVR patches"
 url="https://github.com/MightyM17/mesa-pvr/tree/amber-pvr"
 arch="armhf armv7 aarch64"
@@ -23,7 +23,6 @@ makedepends="
 	flex
 	gettext
 	elfutils-dev
-	libglvnd
 	libtool
 	libunwind-dev
 	libxfixes-dev
@@ -48,10 +47,13 @@ makedepends="
 	zstd-dev
 	"
 # For now, mainline mesa and mesa-amber cannot get installed together
-# Upstream mesa needs libglvnd and -Dglvnd=auto in their build
+# Upstream mesa needs libglvnd and -Dglvnd=auto in their build. Alpine/pmOS ship
+# no libglvnd (checked: edge main/community/testing, pmOS main, armv7), so build
+# without it, like Alpine's mesa: this package then owns libEGL/libGLES/libGL.
 # See https://gitlab.archlinux.org/archlinux/packaging/packages/mesa-amber/-/blob/dac30b1916b3612ff09af01703170211cf51a97e/PKGBUILD#L42
 #depends="mesa"
-provides="mesa mesa-dri-gallium mesa-gbm mesa-glapi"
+provides="mesa mesa-dri-gallium mesa-gbm mesa-glapi mesa-egl mesa-gl mesa-gles"
+replaces="mesa mesa-dri-gallium mesa-gbm mesa-glapi mesa-egl mesa-gl mesa-gles"
 subpackages="
 	$pkgname-dev
 "
@@ -100,7 +102,7 @@ build() {
 		-Dopengl=true \
 		-Dgles1=true \
 		-Dgles2=true \
-		-Dglvnd=auto \
+		-Dglvnd=disabled \
 		-Degl=true \
 		-Db_ndebug=true \
 		-Dmicrosoft-clc=disabled \
