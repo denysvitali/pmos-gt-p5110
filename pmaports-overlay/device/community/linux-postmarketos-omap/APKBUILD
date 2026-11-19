@@ -2,7 +2,7 @@
 maintainer="Mithil Bavishi <bavishimithil@gmail.com>"
 pkgname=linux-postmarketos-omap
 pkgver=7.1.5
-pkgrel=52
+pkgrel=53
 pkgdesc="Mainline kernel fork for OMAP devices (pmos-galaxy: + openpvrsgx DDK 1.17)"
 arch="armv7"
 url="https://kernel.org/"
@@ -15,6 +15,7 @@ makedepends="
 	elfutils-dev
 	findutils
 	flex
+	kmod
 	linux-headers
 	openssl-dev
 	pahole
@@ -88,6 +89,14 @@ package() {
 
 	install -D "$builddir"/include/config/kernel.release \
 		"$pkgdir/usr/share/kernel/$_flavor/kernel.release"
+
+	# modules_install falls back to busybox depmod without kmod, which cannot
+	# read .ko.zst: empty modules.alias, no dependencies (pmos-galaxy B8).
+	local _mods="$pkgdir/usr/lib/modules/$(cat "$builddir"/include/config/kernel.release)"
+	if [ ! -s "$_mods/modules.alias" ] || ! grep -q "^alias fs-ext2 " "$_mods/modules.alias"; then
+		error "depmod produced no module aliases in $_mods"
+		return 1
+	fi
 }
 
 sha512sums="

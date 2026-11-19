@@ -37,6 +37,11 @@ if [ -e "$mods" ] && apk info -W "$mods/modules.dep" >/dev/null 2>&1; then
 fi
 rm -rf "$mods"
 cp -a "$stage/pkg/usr/lib/modules/$kver" "$mods"
+# Regenerate the index with kmod (r52 shipped a busybox-depmod index with no
+# aliases, so nothing was autoloaded and /boot (ext2) failed to mount).
+depmod -a "$kver"
+grep -q "^alias fs-ext2 " "$mods/modules.alias" ||
+	{ echo "ERROR: no module aliases for $kver after depmod" >&2; exit 1; }
 
 # initramfs for the test kernel
 cp "$release_file" "$stage/kernel.release.orig"

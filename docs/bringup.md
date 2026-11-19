@@ -320,3 +320,16 @@ autologin, 1 d 15 h uptime [verified].
   started the RECOVERY image, and where 7.1.5 stopped: not known. No console
   (cmdline `quiet splash`, PANIC_TIMEOUT=0, no pstore). Next: the screen
   state, then a manual power-off, then boot 7.0.5 from KERNEL.
+- Cause found from the test boot's own journal (boot -1, 09:20:43, kernel
+  `7.1.5 #53`): the kernel booted and reached systemd, then `/boot: unknown
+  filesystem type 'ext2'` failed local-fs.target, so emergency mode ran with no
+  console. The initramfs gadget had no UDC and musb came up as host, so there was
+  no USB networking; Wi-Fi never started. This was not the charger patches or the
+  config trim: r52's `modules.alias` is empty and `modules.dep` lists no
+  dependencies [verified]. Reproduced: busybox `depmod` on the same modules gives
+  0 aliases / 126 dependency-less lines, kmod `depmod` gives 1085 aliases with
+  `fs-ext2`, `usbfunc:ncm` and `summit,smb347` [verified]. The APKBUILD lacked
+  `kmod`, so `modules_install` used busybox depmod, which cannot read .ko.zst.
+  Fix (pkgrel 53): `kmod` in makedepends, plus a package() check that fails the
+  build without the `fs-ext2` alias. `stage-test-kernel.sh` also re-runs depmod.
+- Back on 7.0.5 after a manual power-off; KERNEL unchanged [verified].
