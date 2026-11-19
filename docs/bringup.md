@@ -436,3 +436,10 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   `sbin/init` and `usr/sbin/init` [verified, file list], which both resolve to
   usr/bin/init. apk-tools 3.0.10. Workaround: build.sh sets
   `supported_bin_merge=False` in the build's pmaports.cfg (asserted old/new).
+- The `supported_bin_merge=False` workaround did not work: the buildroot was
+  still bin-merged (CI layout dump) and the same error came back [verified]. The
+  layout does not come from that pmaports.cfg switch [inferred: from base
+  packages]. Dropped. Instead, packages-only builds use
+  `pmb config service_manager openrc`, so no systemd is pulled into the buildroot.
+  Built objects link libudev.so.1 etc. by soname, which should run on the
+  systemd device [inferred, to be checked on device]. Images stay systemd.

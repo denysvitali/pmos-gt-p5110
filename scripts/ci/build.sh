@@ -45,16 +45,6 @@ git -C "$work/pmaports" remote add origin https://gitlab.postmarketos.org/postma
 git -C "$work/pmaports" update-ref refs/remotes/origin/main "$(pin pmaports commit)"
 git -C "$work/pmaports" checkout -q -B main
 
-# Build in a non-bin-merged root. systemd 262.2 in the binary repo ships both
-# sbin/init and usr/sbin/init; with bin-merge both resolve to usr/bin/init and
-# apk 3.0.10 fails ("failed to commit usr/sbin/init"). See docs/bringup.md B11.
-cfg="$work/pmaports/pmaports.cfg"
-grep -qx 'supported_bin_merge=True' "$cfg" ||
-	{ echo "ERROR: $cfg: expected supported_bin_merge=True" >&2; exit 1; }
-sed -i 's/^supported_bin_merge=True$/supported_bin_merge=False/' "$cfg"
-grep -qx 'supported_bin_merge=False' "$cfg" ||
-	{ echo "ERROR: $cfg: bin-merge not disabled" >&2; exit 1; }
-
 if [ -d "$root/pmaports-overlay" ]; then
 	cp -a "$root/pmaports-overlay/." "$work/pmaports/"
 	git -C "$work/pmaports" add -A
@@ -80,6 +70,15 @@ yes '' | "$work/pmbootstrap/pmbootstrap.py" --aports "$work/pmaports" \
 pmb config device "$device"
 pmb config ui "$ui"
 pmb config build_pkgs_on_install True
+# Packages only: build against the OpenRC channel. The systemd 262.2 binary
+# package ships sbin/init and usr/sbin/init, which collide in the bin-merged
+# buildroot (apk: "failed to commit usr/sbin/init"), so no makedepends chain
+# may install systemd (docs/bringup.md B11). Images stay systemd.
+if [ "$skip_install" = 1 ]; then
+	pmb config service_manager openrc
+	[ "$(pmb config service_manager | tail -n 1)" = openrc ] ||
+		{ echo "ERROR: service_manager not openrc" >&2; exit 1; }
+fi
 
 # Mirror downloads into the build chroots fail now and then ("I/O error",
 # "Connection reset by peer", apk exit 10). Retry a build a few times; the
