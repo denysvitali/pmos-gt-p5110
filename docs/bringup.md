@@ -372,3 +372,16 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   RECOVERY image (sha256 a7891b82…, mkinitfs is deterministic). A normal reboot
   from KERNEL runs 7.1.5 #54: smb347 bound, Charging, GNOME active, espresso-charger
   exits [verified]. RECOVERY still holds the test slot (CWM backup on the Pi).
+
+## B10 — GPU: vmalloc for the SGX register mapping, 2026-11-19
+
+- pvrsgx vmallocs the whole `gpu@0` resource (`reg = <0x0 0x2000000>`, 32 MiB
+  + 4 KiB). The vmalloc window is 152 MiB (`VmallocTotal`, from SBL's
+  `vmalloc=144m`) with 55 MiB in use [verified, sizes in /proc/vmallocinfo].
+  The free-gap layout could not be measured: /proc/vmallocinfo addresses are
+  hashed even with kptr_restrict=0 [verified], so that measurement was dropped.
+- r54: `CONFIG_CMDLINE="vmalloc=256m"` + `CMDLINE_EXTEND`. The ATAG cmdline from
+  SBL lands in DT bootargs; EXTEND appends ours, and vmalloc= is last-wins
+  [inferred from source, untested]. The old `console=tty0 ignore_loglevel`
+  default was unused (FROM_BOOTLOADER, SBL always passes a cmdline) and is
+  dropped.

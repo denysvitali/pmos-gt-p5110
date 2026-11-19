@@ -2,7 +2,7 @@
 maintainer="Mithil Bavishi <bavishimithil@gmail.com>"
 pkgname=linux-postmarketos-omap
 pkgver=7.1.5
-pkgrel=53
+pkgrel=54
 pkgdesc="Mainline kernel fork for OMAP devices (pmos-galaxy: + openpvrsgx DDK 1.17)"
 arch="armv7"
 url="https://kernel.org/"
@@ -101,7 +101,7 @@ package() {
 
 sha512sums="
 17f95307b6e86a0794df146d97256ba4783b7a494f5eb43aafc14d64367541874cec7f6e8c2ea724eca149db18e4bd5880bf28a8c5e47ae8a769776bbd955af8  linux-7.1.5.tar.xz
-c9b04b95b2a919c2049a93ace83a8b9bb8deeb59f18529b2416e6e071d3705a245f415834279d13148bf571c47d9a1a433ebc0b64e34910c51fc52a765cad8b1  config-postmarketos-omap.armv7
+5d673d13d37036f5bfab8e81fdaba86634cbc3fe021826d24deabcd3c989615bc5fe166890b6e51786c4aee6fa344551e3fbacf3a6dd178800bf2c54bf3ab1e3  config-postmarketos-omap.armv7
 1a68e3a32ae1e56d325c0f759ee66d64d14f46a5d52e75ae008dfddac335beb3aa7acaf62abb95b6d5ce1557f0cf9b4c31ab78e110af178db1ac963bb377dbf0  0001-iio-rescale-revert-logic.patch
 11bcc2bdcd8862e56f23a763d393b1d5f62af82cfd6dd347b5786b9f299144950d5941579091fea144371bad1188f366d8cd5a26453fc852fd3e769df2bd21bc  0002-hsi-dma-fix.patch
 a17ddc7a41ce2a6be04a8ee0ffcfb8dbb0381d1ce7fac8336befd79bc388ce5d16b6ba3a4732a540a43add55c43b015a3b77205a007a058d4d6e3291234b5cc0  0003-Add-TWL6030-power-button-support-to-twl-pwrbutton.patch
