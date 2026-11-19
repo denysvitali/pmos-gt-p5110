@@ -524,3 +524,6 @@ clients broken, GTK clients software-rendered.
   in libshell-16.so]. Set to 'nothing' (user + dconf default in tablet-tune.sh).
 - tablet-tune.sh's charger check now accepts the bound kernel smb347 driver
   (espresso-charger exits by design with 0013).
+- Confirmed by the user and the journal: press → `doing system action 'blank'
+  (reason 'power key released')` + `_turnOffScreen()`, next press → `cancelling
+  action 'blank'` + `_turnOnScreen()` [verified, 20:52].
