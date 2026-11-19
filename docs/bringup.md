@@ -458,3 +458,14 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   (Amber)", GLES vendor Imagination Technologies, renderer **PowerVR SGX 540**,
   "OpenGL ES 2.0 build 1.17@4948957". This was before any compositor used it;
   GNOME still ran on the old (deleted, still mapped) mesa 26 libraries.
+- **GNOME on the SGX540** [verified]: after `systemctl restart gdm` the greeter
+  gnome-shell (`--mode=gdm`) mapped `pvr_dri.so`, `libGLESv2_PVR_MESA`,
+  `libsrv_um` and `/dev/dri/renderD129`. mutter: "Created gbm renderer for
+  /dev/dri/card0" (omapdrm scanout; card1 is render-only: "No suitable mode
+  setting backend", expected). After a cold boot: pvrsrvinit active at boot, the
+  autologin `gnome-shell --mode=user` maps the PVR libraries, panel DPMS On.
+  Steady state 1 min after boot: CPU 85 % idle, gnome-shell 0–1 % (was ~21 %
+  with software rendering, B2). Battery Full, +54 mA.
+- Not verified: what the screen shows (no camera). One
+  `gnome-session-init-worker` SIGABRT coredump from the gdm restart (16:22:16);
+  none after the cold boot was checked yet.
