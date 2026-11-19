@@ -333,3 +333,34 @@ autologin, 1 d 15 h uptime [verified].
   Fix (pkgrel 53): `kmod` in makedepends, plus a package() check that fails the
   build without the `fs-ext2` alias. `stage-test-kernel.sh` also re-runs depmod.
 - Back on 7.0.5 after a manual power-off; KERNEL unchanged [verified].
+
+## B9 — r53 test boot: 7.1.5 runs, charger driver works, 2026-11-19
+
+Booted once from RECOVERY (`boot-test.img` a7891b82…, kernel `7.1.5 #54`
+from release packages-3195a439c861). The shipped module index has 1085
+aliases [verified]. USB gadget came up 12 s after shutdown, Wi-Fi
+within 3 min, GNOME active, system `degraded` (only plymouth-start failed)
+[verified].
+
+Charger (0013/0014), on hardware [verified]:
+- `smb347` bound to 4-0006, `smb347-usb` ONLINE=1, Charging, Fast.
+- Registers set by the kernel driver: CMD_B=0x03 (HC), CFG_CURRENT_LIMIT=0x63
+  (900 mA), CFG_PIN=0x04 (USB mode by register, SW charge control),
+  CMD_A=0x02 (charging enabled, write-protect restored), STAT_C=0x05.
+- `espresso-charger` saw the kernel driver and exited.
+- Positive control for the re-init: forced CMD_B=0x02 by i2cset; within 8 s
+  the driver logged `configuration lost (CMD_B=0x2), re-initialising`, and
+  CMD_B/ICL/CFG_PIN were back to 0x03/0x63/0x04.
+- Battery status now reports (not "Unknown"): `Discharging`, -250 mA at 99 %
+  with GNOME starting while the charger says Charging. The net under GUI load
+  on the Pi 4 port is not yet measured at steady state.
+- Not tested: physical re-plug / VBUS loss with the kernel driver (the
+  forced-register test covers the same detection path) [inferred].
+
+GPU (not working yet) [verified, dmesg]: `pvrsrvkm` 56000000.gpu probe fails.
+`vmalloc_node_range for size 33558528 failed: Address range restricted to
+0xf6000000 - 0xff800000`, then `SysLocateDevices: Failed to map SGX registers`.
+The error path WARNs in `drm_client_sysrq_unregister` (no crash). SBL's cmdline
+carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
+/proc/cmdline). A larger vmalloc= needs a kernel-side cmdline
+(CONFIG_CMDLINE_EXTEND or similar) [inferred, untested].
