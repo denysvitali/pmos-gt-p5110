@@ -385,3 +385,19 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   [inferred from source, untested]. The old `console=tty0 ignore_loglevel`
   default was unused (FROM_BOOTLOADER, SBL always passes a cmdline) and is
   dropped.
+- r54 test boot from RECOVERY: r54 zImage+DTB (DTB byte-identical to r53),
+  ramdisk and modules = installed r53 [verified, image built from
+  /boot/initramfs]. Results [verified]:
+  - /proc/cmdline has SBL's `vmalloc=144m` (arg 15) and ours `vmalloc=256m`
+    (arg 25), last wins: `VmallocTotal` 270336 kB (was 155648), LowTotal
+    737652 kB (was 852340).
+  - **pvrsrvkm probes**: no `vmalloc_node_range … failed` / `Failed to map
+    SGX registers`. `/dev/dri/card1` + `renderD129` exist,
+    `pvrsrvkm_omap4_sgx540_120` loaded, refcount 9.
+  - Wi-Fi absent: cfg80211 (r53) refused, `failed to validate module
+    [cfg80211] BTF: -22` (DEBUG_INFO_BTF_MODULES=y, no
+    MODULE_ALLOW_BTF_MISMATCH). This comes from mixing r53 modules with the r54
+    kernel, not a defect of r54 [inferred]. Boot stuck only on time-sync (no network).
+  - A normal reboot returned to r53 from KERNEL (Wi-Fi, Charging) [verified].
+- Lesson: a kernel-only A/B test with the other build's modules is invalid for
+  BTF modules. Test kernel + modules from the same build.
