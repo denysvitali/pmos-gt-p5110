@@ -77,6 +77,11 @@ pmb config build_pkgs_on_install True
 for pkg in ${PMOS_FORCE_BUILD:-}; do
 	n=1
 	until pmb build --force --arch armv7 "$pkg"; do
+		root=$(pmb config work)/chroot_buildroot_armv7
+		echo "DEBUG: buildroot layout after failed attempt $n:" >&2
+		sudo ls -la "$root" "$root/usr" >&2 || true
+		sudo ls -la "$root/usr/sbin" "$root/sbin" "$root/usr/bin/init" "$root/usr/sbin/init" >&2 || true
+		sudo "$(pmb config work)/apk.static" --version >&2 || true
 		if [ "$n" -ge 3 ]; then
 			echo "ERROR: building $pkg failed $n times" >&2
 			exit 1
