@@ -71,8 +71,20 @@ pmb config device "$device"
 pmb config ui "$ui"
 pmb config build_pkgs_on_install True
 
+# Mirror downloads into the build chroots fail now and then ("I/O error",
+# "Connection reset by peer", apk exit 10). Retry a build a few times; the
+# apk cache keeps what was already fetched. A real build error fails 3 times.
 for pkg in ${PMOS_FORCE_BUILD:-}; do
-	pmb build --force --arch armv7 "$pkg"
+	n=1
+	until pmb build --force --arch armv7 "$pkg"; do
+		if [ "$n" -ge 3 ]; then
+			echo "ERROR: building $pkg failed $n times" >&2
+			exit 1
+		fi
+		n=$((n + 1))
+		echo "WARNING: building $pkg failed, attempt $n of 3" >&2
+		sleep 30
+	done
 done
 
 if [ "$skip_install" != 1 ]; then

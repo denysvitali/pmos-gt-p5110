@@ -423,3 +423,7 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   main index [verified]. Fix: no libglvnd, `-Dglvnd=disabled`. The package then
   owns libEGL/libGLES/libGL, so it provides and replaces mesa-egl, mesa-gl and
   mesa-gles as well (pkgrel 51).
+- Second attempt (f48d618) got past dependency resolution (libglvnd fix OK),
+  then failed installing the armv7 buildroot: `I/O error` / `Connection reset by
+  peer` from the mirror, apk exit 10 [verified, ci-log]. A transient failure:
+  build.sh now retries a package build up to 3 times.
