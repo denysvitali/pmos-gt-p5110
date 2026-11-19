@@ -469,3 +469,26 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
 - Not verified: what the screen shows (no camera). One
   `gnome-session-init-worker` SIGABRT coredump from the gdm restart (16:22:16);
   none after the cold boot was checked yet.
+
+## B12 — performance survey on r54 + PVR, 2026-11-19
+
+Idle after boot [verified]: load 0.02, 577 MiB available, zram swap (zstd,
+1.4 GiB) active, cpufreq ondemand 300–1008 MHz, 63.5 °C. Boot: 20.4 s kernel
+(incl. initramfs) + 40.4 s userspace, graphical.target at 32 s.
+Gaps in the kernel log [verified, dmesg]:
+- 2.6 s extracting the 10 MB gzip initramfs-extra.
+- 5.6 s + 4.2 s in initramfs stage 2 (root lookup; `/dev/input` not yet present).
+- 4.6 s `brcmf_p2p_create_p2pdev: timeout occurred` (the P2P iface create fails,
+  err=-5), which delays Wi-Fi.
+- `systemd-time-wait-sync` 32.8 s (NTP), not on the graphical path.
+
+**EGL Wayland clients cannot present** [verified]: `es2gears_wayland` (with the
+session env, MESA_LOADER_DRIVER_OVERRIDE=pvr confirmed in the user manager) is
+killed: `wl_display.error 7: failed to import supplied dmabufs: Arguments are
+inconsistent` (EGL_BAD_MATCH). WAYLAND_DEBUG: the compositor advertises
+`wl_drm.device(/dev/dri/renderD128)` (omapdrm) and only implicit modifiers. The
+client sends one plane XR24 300x300 stride 1216 mod INVALID via create_immed.
+So mutter's PVR EGL rejects the dmabuf the client's PVR stack produced. GTK4 apps
+(gnome-control-center) start without errors. Presumed: GTK4's GL renderer needs
+GLES ≥ 3.0 and falls back to cairo [inferred]. So: compositor accelerated, EGL
+clients broken, GTK clients software-rendered.
