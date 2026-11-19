@@ -576,3 +576,22 @@ clients broken, GTK clients software-rendered.
     init_functions.sh]. lz4/none would halt boot. The boot.img initramfs cannot
     grow either (7.56 of 8 MiB). Dropped.
   - systemd-time-wait-sync (32.8 s) is not on the graphical path.
+- Hunting the gnome-shell crash (r52 + gdb) [verified unless noted]:
+  - Fault: `ldr.w r8,[r5,#12]; ldr.w r3,[r8]; ldr r2,[r3,#4]` with r3=NULL,
+    blob +0x16e6c. A stack scan gives libmutter-cogl (near
+    `_cogl_framebuffer_flush_journal`) ← libmutter (near `meta_shaped_texture_*`)
+    ← clutter paint ← gjs.
+  - gdb dprintf trace of mutter's GL calls: LINEAR filters, CLAMP_TO_EDGE, no
+    glGenerateMipmap. The last calls before the SIGSEGV were `glDeleteTextures` x2.
+  - Standalone repros (`/var/tmp/dmabuf-render2.c`, `dmabuf-delete.c`): cross-process
+    GL-rendered client buffers, 2-buffer reuse, 300x300 NPOT, image destroyed
+    after binding, texture or scissor FBO, deleting textures (also while a draw is
+    in flight): **no crash, correct colours**. A separate blob bug turned up:
+    `glGenerateMipmap` on any EGLImage texture segfaults at +0x14662 (not mutter's
+    site).
+  - Not reproduced outside mutter. Next approach: keep client buffers off mutter's
+    linux-dmabuf path entirely.
+- mesa-pvr r54: no `EGL_EXT_image_dma_buf_import_modifiers`. mutter's
+  `meta_wayland_dma_buf_manager_new` returns NULL without it, so no
+  zwp_linux_dmabuf_v1 global, and Mesa clients fall back to wl_drm
+  (EGL_WAYLAND_BUFFER_WL import) [verified, mutter source]. Untested.
