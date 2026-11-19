@@ -45,6 +45,16 @@ git -C "$work/pmaports" remote add origin https://gitlab.postmarketos.org/postma
 git -C "$work/pmaports" update-ref refs/remotes/origin/main "$(pin pmaports commit)"
 git -C "$work/pmaports" checkout -q -B main
 
+# Build in a non-bin-merged root. systemd 262.2 in the binary repo ships both
+# sbin/init and usr/sbin/init; with bin-merge both resolve to usr/bin/init and
+# apk 3.0.10 fails ("failed to commit usr/sbin/init"). See docs/bringup.md B11.
+cfg="$work/pmaports/pmaports.cfg"
+grep -qx 'supported_bin_merge=True' "$cfg" ||
+	{ echo "ERROR: $cfg: expected supported_bin_merge=True" >&2; exit 1; }
+sed -i 's/^supported_bin_merge=True$/supported_bin_merge=False/' "$cfg"
+grep -qx 'supported_bin_merge=False' "$cfg" ||
+	{ echo "ERROR: $cfg: bin-merge not disabled" >&2; exit 1; }
+
 if [ -d "$root/pmaports-overlay" ]; then
 	cp -a "$root/pmaports-overlay/." "$work/pmaports/"
 	git -C "$work/pmaports" add -A

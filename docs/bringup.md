@@ -427,3 +427,12 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   then failed installing the armv7 buildroot: `I/O error` / `Connection reset by
   peer` from the mirror, apk exit 10 [verified, ci-log]. A transient failure:
   build.sh now retries a package build up to 3 times.
+- Third/fourth attempt: deterministic, 3/3 retries: `systemd-262.2-r0: failed to
+  commit usr/sbin/init: No such file or directory` (and udevadm) while
+  installing makedepends into chroot_buildroot_armv7. Both pmaports pins have
+  `supported_bin_merge=True`, so the pin bump hypothesis was refuted [verified].
+  The buildroot is bin-merged as designed (`/sbin -> usr/bin`, `/usr/sbin ->
+  bin`) [verified, CI layout dump], and the systemd 262.2 apk contains both
+  `sbin/init` and `usr/sbin/init` [verified, file list], which both resolve to
+  usr/bin/init. apk-tools 3.0.10. Workaround: build.sh sets
+  `supported_bin_merge=False` in the build's pmaports.cfg (asserted old/new).
