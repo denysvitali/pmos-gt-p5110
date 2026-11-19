@@ -401,3 +401,14 @@ carries `vmalloc=144m`, and SBL drops the boot.img cmdline (no `pmos_*` args in
   - A normal reboot returned to r53 from KERNEL (Wi-Fi, Charging) [verified].
 - Lesson: a kernel-only A/B test with the other build's modules is invalid for
   BTF modules. Test kernel + modules from the same build.
+- r54 installed (7.1.5-r53 -> r54, `apk add --allow-untrusted`). Backups:
+  /var/backup/r53/{boot.img,linux-…-r53.apk} on the tablet, and
+  `scratch/kernel-part/boot-r53.img` on the Pi (sha256 a7891b82…). KERNEL ==
+  /boot/boot.img (6f0d85a4…), and its kernel+DTB are identical to the tested r54
+  test image. Normal boot from KERNEL [verified]: `7.1.5 #55`, Wi-Fi in 90 s
+  (brcmfmac loaded: matched modules, no BTF/taint messages), VmallocTotal
+  270336 kB, `pvrsrvkm_omap4_sgx540_120` loaded with card1/renderD129, smb347
+  Charging. Only plymouth-start failed (as on 7.0.5/r53).
+- GPU kernel side done. Userspace (sgx-ddk-um blobs, mesa-pvr-dri-classic in
+  pmaports-overlay/pvr) has not been built or installed yet. GNOME still renders
+  in software.
