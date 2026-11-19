@@ -541,3 +541,19 @@ clients broken, GTK clients software-rendered.
   validation (B10).
 - CWM stays out of RECOVERY by user choice. Its backup is
   scratch/backup-20261103/RECOVERY.img.
+
+## B15 — EGL Wayland clients on PVR: explicit MOD_INVALID, 2026-11-19
+
+- Reproduced the import outside mutter (`/var/tmp/dmabuf-test.c` on the tablet:
+  GBM BO on card0 with pvr, dmabuf export, eglCreateImageKHR
+  EGL_LINUX_DMA_BUF_EXT) [verified]:
+  XR24 300x300 stride 1216 with no modifier attributes: **OK**. Same buffer with
+  explicit LINEAR or explicit DRM_FORMAT_MOD_INVALID: **EGL_BAD_MATCH**
+  (0x3009). AR24 OK. eglQueryDmaBufFormatsEXT lists XR24.
+- mutter 48 `meta-wayland-dma-buf.c` always passes a non-NULL modifiers array
+  (= dma_buf->drm_modifier, also when INVALID), and `meta_egl_create_dmabuf_image`
+  then adds MODIFIER_LO/HI [verified, mutter 48.0 source]. Mesa 21.3
+  `dri2_create_image_dma_buf` routes any present modifier to
+  createImageFromDmaBufs2, which fails on pvr [verified, mesa-pvr source].
+- Fix: mesa-pvr patch: an explicit DRM_FORMAT_MOD_INVALID is treated as no
+  modifier (pkgrel 52). Untested.
