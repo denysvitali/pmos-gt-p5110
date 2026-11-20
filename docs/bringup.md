@@ -836,3 +836,15 @@ clients broken, GTK clients software-rendered.
   input limit), the backlight left at 7, hours of GPU tests. Rescue: GDM masked,
   `charge-rescue.service` (backlight 0, SMB347 input 1.8 A at boot) → +0.9–1.36 A
   at 8 % [verified]. Both env files restored.
+- Kernel r58 back in slot A at 30 % (B = r56); `charge-rescue.service` removed,
+  GDM unmasked [verified].
+- **Software-rendering control** [verified]: with `50-pvr.conf` and
+  `/etc/profile.d/mesa.sh` moved away and the user manager restarted, mesa-pvr's
+  loader still picks pvr_dri for omapdrm (no override needed). With
+  `MESA_LOADER_DRIVER_OVERRIDE=kms_swrast` (user environment.d, user manager
+  restarted) gnome-shell maps only kms_swrast_dri.so and its scanout has the UI:
+  1028/1028 samples non-zero, 262 distinct colours. **So mutter on pvr_dri never
+  writes its scanout buffers**, while cage on pvr does. It fails the same with
+  every package rollback, so it probably never worked [inferred].
+- Left on the tablet for now: `~/.config/environment.d/99-swrast-test.conf`
+  (GNOME on kms_swrast); `50-pvr.conf` and `mesa.sh` moved to `/var/tmp/*.disabled`.
