@@ -682,3 +682,32 @@ clients broken, GTK clients software-rendered.
   allocation failure that boot was the 11 MB one at shell start (106 s), not
   at the crash (~166 s). r57 keeps swrast as the client default; the session after
   reboot is responsive.
+
+## B17 — the gnome-shell SGX crash is an FBO/EGLImage use-after-free, 2026-11-20
+
+- Crash decoded (core of gnome-shell, mesa r57) [verified]: `libGLESv2_PVR_MESA +
+  0x16e6c` is in a surface flush (`0x16d80`) that waits on `surface->[0xc]`
+  (sync info). Its data pointer `[0]` is NULL. Chain: `glDeleteFramebuffers` →
+  generic name delete `0x14bc4` → FBO delete callback `0xe1a0` (checks attachment
+  types 0x8d41/0x1702) → `0xe0f0` → `0xe044` → flush. Stack frames above it are in
+  cogl/mutter, from a Wayland request.
+- Standalone repro `scripts/pvr-tests/fbo-uaf.c`, no compositor, run twice [verified]:
+  an FBO with an EGLImage (dmabuf) texture attached, rendered to, then
+  - attachment kept, texture deleted, image and bo freed, FBO deleted: OK (a);
+  - **detached, texture deleted, image and bo freed, FBO deleted: SIGSEGV +0x16e6c** (f);
+  - **texture deleted while the FBO is bound (implicit detach): SIGSEGV +0x16e6c** (g);
+  - f with a plain glTexImage2D texture: OK (h); f with the image and bo kept: OK (i).
+  So the FBO keeps a pointer to the image memory's sync after the detach drops
+  the reference [inferred from h/i]. A separate crash: glReadPixels from such an FBO,
+  `+0x14662` (e) [verified, not addressed].
+- The gnome-shell SIGSEGV when GDM stops is the same site [verified, 08:56 core].
+- Fix (mesa-pvr r58, `pvr-defer-eglimage-texture-delete-until-fbo-delete.patch`): the
+  GLES2 dispatch wraps glEGLImageTargetTexture2DOES, glFramebufferTexture2D(OES),
+  glDeleteTextures and glDeleteFramebuffers(OES). An EGLImage texture ever
+  attached to a still-live FBO of the current context is deleted only after those
+  FBOs, which turns f/g into a. The logic is unit-tested on the Pi
+  (`scripts/pvr-tests/fbo-defer-harness.c`, 12 checks) [verified]. Not yet on hardware.
+- Battery: with GNOME stopped and the backlight at 6, the tablet drew −0.75 A on
+  the Pi port and browned out once (boot-ROM loop ~17 min). Backlight 0 gives
+  +0.40 A [verified]. SMB347 had reverted to `CMD_A=0x02 CFG_PIN=0x04` after VBUS
+  loss. Rewriting the stock values changed nothing measurable [verified].

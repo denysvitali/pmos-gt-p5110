@@ -1,0 +1,338 @@
+From: pmos-galaxy
+Subject: [PATCH] pvr: defer deleting EGLImage textures until their FBOs are deleted
+
+SGX540 DDK 1.17: an FBO whose colour attachment was an EGLImage texture keeps
+a pointer to the image memory's sync object after the attachment is dropped
+(explicit detach, or glDeleteTextures while the FBO is bound). When the image
+memory is freed before the FBO is deleted, glDeleteFramebuffers flushes the
+FBO, waits on the freed sync and crashes in libGLESv2_PVR_MESA.so + 0x16e6c
+(gnome-shell with hardware EGL Wayland clients), or spins in the wait.
+Reproduced standalone; plain textures and still-attached image textures are
+not affected (pmos-galaxy docs/bringup.md B17).
+
+Wrap glEGLImageTargetTexture2DOES, glFramebufferTexture2D, glDeleteTextures
+and glDeleteFramebuffers in the GLES2 dispatch table: an EGLImage texture
+ever attached to a still-live FBO of the current context is really deleted
+only after those FBOs are.
+---
+--- a/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 09:02:48.952794941 +0000
++++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 09:04:03.083833491 +0000
+@@ -34,8 +34,10 @@
+  */
+ 
+ #include <stdlib.h>
++#include <string.h>
+ #include <dlfcn.h>
+ #include <assert.h>
++#include <pthread.h>
+ 
+ #include "main/version.h"
+ #include "main/errors.h"
+@@ -145,6 +147,264 @@
+ 	}
+ }
+ 
++/*
++ * SGX540 DDK 1.17 workaround: an FBO whose colour attachment was an
++ * EGLImage texture keeps a pointer to the image memory's sync object after
++ * the attachment is dropped (explicit detach, or glDeleteTextures while the
++ * FBO is bound). If the image memory is freed before the FBO is deleted,
++ * glDeleteFramebuffers flushes the FBO, waits on the freed sync and crashes
++ * (libGLESv2_PVR_MESA.so + 0x16e6c) or spins. Plain textures and image
++ * textures that stay attached are not affected.
++ *
++ * So the real deletion of an EGLImage texture that was ever attached to a
++ * still-live FBO of this context is deferred until those FBOs are deleted.
++ */
++typedef void (*pvr_delete_fn)(GLsizei, const GLuint *);
++typedef void (*pvr_fbtex_fn)(GLenum, GLenum, GLenum, GLuint, GLint);
++typedef void (*pvr_eglimage_fn)(GLenum, void *);
++typedef void (*pvr_getint_fn)(GLenum, GLint *);
++
++struct pvr_fbo_att { void *ctx; GLuint fbo; GLuint tex; };
++struct pvr_img_tex { void *ctx; GLuint tex; int deferred; };
++
++static pthread_mutex_t gsWrapLock = PTHREAD_MUTEX_INITIALIZER;
++static __thread void *gpvCurCtx;
++static pvr_delete_fn real_DeleteTextures, real_DeleteFramebuffers;
++static pvr_fbtex_fn real_FramebufferTexture2D;
++static pvr_eglimage_fn real_EGLImageTargetTexture2DOES;
++static pvr_getint_fn real_GetIntegerv;
++static struct pvr_fbo_att *gpsAtt;
++static unsigned guAtt, guAttCap;
++static struct pvr_img_tex *gpsImg;
++static unsigned guImg, guImgCap;
++
++#define PVR_TEXTURE_2D 0x0DE1
++#define PVR_TEXTURE_BINDING_2D 0x8069
++#define PVR_FRAMEBUFFER_BINDING 0x8CA6
++
++static struct pvr_img_tex *pvr_find_img(GLuint tex)
++{
++	for (unsigned i = 0; i < guImg; i++)
++		if (gpsImg[i].ctx == gpvCurCtx && gpsImg[i].tex == tex)
++			return &gpsImg[i];
++	return NULL;
++}
++
++static int pvr_tex_attached(GLuint tex)
++{
++	for (unsigned i = 0; i < guAtt; i++)
++		if (gpsAtt[i].ctx == gpvCurCtx && gpsAtt[i].tex == tex)
++			return 1;
++	return 0;
++}
++
++static void pvr_drop_img(struct pvr_img_tex *psImg)
++{
++	*psImg = gpsImg[--guImg];
++}
++
++static void
++wrap_EGLImageTargetTexture2DOES(GLenum target, void *image)
++{
++	GLint tex = 0;
++
++	real_EGLImageTargetTexture2DOES(target, image);
++	if (target != PVR_TEXTURE_2D || !real_GetIntegerv)
++		return;
++	real_GetIntegerv(PVR_TEXTURE_BINDING_2D, &tex);
++	if (tex == 0)
++		return;
++
++	pthread_mutex_lock(&gsWrapLock);
++	if (!pvr_find_img(tex))
++	{
++		if (guImg == guImgCap)
++		{
++			unsigned uCap = guImgCap ? guImgCap * 2 : 32;
++			void *pv = realloc(gpsImg, uCap * sizeof(*gpsImg));
++			if (!pv)
++				goto out;
++			gpsImg = pv;
++			guImgCap = uCap;
++		}
++		gpsImg[guImg++] = (struct pvr_img_tex){ gpvCurCtx, tex, 0 };
++	}
++out:
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++static void
++wrap_FramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget,
++			  GLuint texture, GLint level)
++{
++	GLint fbo = 0;
++
++	real_FramebufferTexture2D(target, attachment, textarget, texture, level);
++	if (texture == 0 || !real_GetIntegerv)
++		return;
++
++	pthread_mutex_lock(&gsWrapLock);
++	if (pvr_find_img(texture))
++	{
++		real_GetIntegerv(PVR_FRAMEBUFFER_BINDING, &fbo);
++		for (unsigned i = 0; fbo && i < guAtt; i++)
++			if (gpsAtt[i].ctx == gpvCurCtx && gpsAtt[i].fbo == (GLuint)fbo &&
++			    gpsAtt[i].tex == texture)
++				fbo = 0;
++		if (fbo)
++		{
++			if (guAtt == guAttCap)
++			{
++				unsigned uCap = guAttCap ? guAttCap * 2 : 32;
++				void *pv = realloc(gpsAtt, uCap * sizeof(*gpsAtt));
++				if (!pv)
++					goto out;
++				gpsAtt = pv;
++				guAttCap = uCap;
++			}
++			gpsAtt[guAtt++] = (struct pvr_fbo_att){ gpvCurCtx, fbo, texture };
++		}
++	}
++out:
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++static void
++wrap_DeleteTextures(GLsizei n, const GLuint *textures)
++{
++	GLuint auStack[16];
++	GLuint *puKeep = auStack;
++	GLsizei nKeep = 0;
++
++	if (n <= 0 || !textures)
++	{
++		real_DeleteTextures(n, textures);
++		return;
++	}
++	if (n > 16 && !(puKeep = malloc(n * sizeof(*puKeep))))
++	{
++		real_DeleteTextures(n, textures);
++		return;
++	}
++
++	pthread_mutex_lock(&gsWrapLock);
++	for (GLsizei i = 0; i < n; i++)
++	{
++		struct pvr_img_tex *psImg = pvr_find_img(textures[i]);
++
++		if (psImg && pvr_tex_attached(textures[i]))
++		{
++			psImg->deferred = 1;
++			continue;
++		}
++		if (psImg)
++			pvr_drop_img(psImg);
++		puKeep[nKeep++] = textures[i];
++	}
++	pthread_mutex_unlock(&gsWrapLock);
++
++	if (nKeep)
++		real_DeleteTextures(nKeep, puKeep);
++	if (puKeep != auStack)
++		free(puKeep);
++}
++
++static void
++wrap_DeleteFramebuffers(GLsizei n, const GLuint *framebuffers)
++{
++	/* Delete the FBOs first, while deferred textures are still alive. */
++	real_DeleteFramebuffers(n, framebuffers);
++	if (n <= 0 || !framebuffers)
++		return;
++
++	pthread_mutex_lock(&gsWrapLock);
++	for (unsigned i = 0; i < guAtt; )
++	{
++		int bDrop = 0;
++
++		for (GLsizei j = 0; j < n && !bDrop; j++)
++			bDrop = gpsAtt[i].ctx == gpvCurCtx && gpsAtt[i].fbo == framebuffers[j];
++		if (bDrop)
++			gpsAtt[i] = gpsAtt[--guAtt];
++		else
++			i++;
++	}
++	for (unsigned i = 0; i < guImg; )
++	{
++		if (gpsImg[i].ctx == gpvCurCtx && gpsImg[i].deferred &&
++		    !pvr_tex_attached(gpsImg[i].tex))
++		{
++			GLuint tex = gpsImg[i].tex;
++
++			pvr_drop_img(&gpsImg[i]);
++			real_DeleteTextures(1, &tex);
++		}
++		else
++		{
++			i++;
++		}
++	}
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++/* Forget a destroyed context, so a new one at the same address starts clean. */
++void
++pvrdri_forget_context(PVRDRIContext *psPVRContext)
++{
++	pthread_mutex_lock(&gsWrapLock);
++	for (unsigned i = 0; i < guAtt; )
++	{
++		if (gpsAtt[i].ctx == psPVRContext)
++			gpsAtt[i] = gpsAtt[--guAtt];
++		else
++			i++;
++	}
++	for (unsigned i = 0; i < guImg; )
++	{
++		if (gpsImg[i].ctx == psPVRContext)
++			pvr_drop_img(&gpsImg[i]);
++		else
++			i++;
++	}
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++static _glapi_proc
++pvrdri_wrap_func(PVRDRIAPIType eAPI, void *pvLibHandle, const char *psFunc,
++		 _glapi_proc pfFunc)
++{
++	if (eAPI != PVRDRI_API_GLES2)
++		return pfFunc;
++
++	if (!real_GetIntegerv)
++		real_GetIntegerv = (pvr_getint_fn)dlsym(pvLibHandle, "glGetIntegerv");
++
++	if (!strcmp(psFunc, "glEGLImageTargetTexture2DOES"))
++	{
++		real_EGLImageTargetTexture2DOES = (pvr_eglimage_fn)pfFunc;
++		return (_glapi_proc)wrap_EGLImageTargetTexture2DOES;
++	}
++	if (!strcmp(psFunc, "glFramebufferTexture2D") ||
++	    !strcmp(psFunc, "glFramebufferTexture2DOES"))
++	{
++		real_FramebufferTexture2D = (pvr_fbtex_fn)pfFunc;
++		return (_glapi_proc)wrap_FramebufferTexture2D;
++	}
++	if (!strcmp(psFunc, "glDeleteTextures"))
++	{
++		real_DeleteTextures = (pvr_delete_fn)pfFunc;
++		return (_glapi_proc)wrap_DeleteTextures;
++	}
++	if (!strcmp(psFunc, "glDeleteFramebuffers") ||
++	    !strcmp(psFunc, "glDeleteFramebuffersOES"))
++	{
++		real_DeleteFramebuffers = (pvr_delete_fn)pfFunc;
++		return (_glapi_proc)wrap_DeleteFramebuffers;
++	}
++
++	return pfFunc;
++}
++
+ static void
+ pvrdri_add_mesa_dispatch(struct _glapi_table *psTable,
+ 			 PVRDRIAPIType eAPI,
+@@ -176,6 +436,8 @@
+ 		}
+ 	}
+ 
++	pfFunc = pvrdri_wrap_func(eAPI, pvLibHandle, psFunc, pfFunc);
++
+ 	asFunc[0] = psFunc;
+ 	iOffset = _glapi_add_dispatch(asFunc, "");
+ 	if (iOffset == -1)
+@@ -254,6 +516,7 @@
+ void
+ pvrdri_set_null_dispatch_table(void)
+ {
++	gpvCurCtx = NULL;
+ 	_glapi_set_dispatch(NULL);
+ }
+ 
+@@ -262,5 +525,6 @@
+ {
+ 	struct _glapi_table *psTable = pvrdri_get_dispatch_table(psPVRContext->psPVRScreen, psPVRContext->eAPI);
+ 
++	gpvCurCtx = psPVRContext;
+ 	_glapi_set_dispatch(psTable);
+ }
+--- a/src/mesa/drivers/dri/pvr/pvrdri.c	2026-11-20 09:04:02.919835618 +0000
++++ b/src/mesa/drivers/dri/pvr/pvrdri.c	2026-11-20 09:04:03.083833491 +0000
+@@ -945,6 +945,7 @@
+ 				 psPVRContext->eAPI,
+ 				 psPVRScreen->psImpl);
+ 
++	pvrdri_forget_context(psPVRContext);
+ 	free(psPVRContext);
+ 
+ #if defined(DEBUG)
+--- a/src/mesa/drivers/dri/pvr/pvrmesa.h	2026-11-20 09:04:02.935835410 +0000
++++ b/src/mesa/drivers/dri/pvr/pvrmesa.h	2026-11-20 09:04:03.083833491 +0000
+@@ -38,4 +38,6 @@
+ 
+ void pvrdri_set_dispatch_table(PVRDRIContext *psPVRContext);
+ 
++void pvrdri_forget_context(PVRDRIContext *psPVRContext);
++
+ #endif /* !defined(__PVRMESA_H__) */
