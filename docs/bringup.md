@@ -848,3 +848,17 @@ clients broken, GTK clients software-rendered.
   every package rollback, so it probably never worked [inferred].
 - Left on the tablet for now: `~/.config/environment.d/99-swrast-test.conf`
   (GNOME on kms_swrast); `50-pvr.conf` and `mesa.sh` moved to `/var/tmp/*.disabled`.
+- **Root cause of GNOME's empty frames** [verified]: gdb on the PVR buffer
+  allocation (`PVRDRIBufferCreate` → `libdbm` `buffer_create`):
+  `CREATE_DUMB height=4096000 width=1 bpp=8` → omapdrm `pitch=8 size=32768000`.
+  omapdrm pads each 1-byte row to 8 bytes, so every buffer is 8× its size. With two
+  triple-buffered window surfaces (mutter creates surface A, then B, then destroys
+  A) the SGX VMArena runs out. Repro `scripts/pvr-tests/gbm-paths.c w`:
+  `CreateImageShared: Failed to create buffer`, `make-current 0`. In GNOME the
+  window surface ends up without a colour buffer. Its render target reads back as
+  uniform `000000ff`, and the scanout bos stay zero.
+- Ruled out on the way [verified, standalone]: BGRA/RG/ALPHA/TexStorage uploads,
+  NPOT clamp and mipmaps, VBO paths incl. cogl's map/unbind/rebind, discard of
+  depth+stencil, no-config contexts, FBO→0 rebinding, buffer age.
+- Fix: `dbm-dumb-buffers-with-4096-byte-rows.patch` (sgx-ddk-um r52): width 1024,
+  bpp 32, height ⌈size/4096⌉.

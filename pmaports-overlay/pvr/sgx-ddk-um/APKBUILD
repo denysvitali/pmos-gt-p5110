@@ -2,7 +2,7 @@
 pkgname=sgx-ddk-um
 pkgver=1.17.4948957
 _commit=c7dbb0a08424a4fb1c034444b00f10781c4e7108
-pkgrel=51
+pkgrel=52
 pkgdesc="(WARNING: runs as root) Proprietary userspace libraries for PowerVR SGX GPUs"
 url="https://git.ti.com/cgit/graphics/omap5-sgx-ddk-um-linux"
 arch="armhf armv7 aarch64"
@@ -18,6 +18,7 @@ source="
 	https://github.com/MightyM17/sgx-ddk-um/archive/$_commit.tar.gz
 	pvrsrvinit.service
 	90-sgx-ddk-um.preset
+	dbm-dumb-buffers-with-4096-byte-rows.patch
 	"
 builddir="$srcdir/sgx-ddk-um-$_commit"
 
@@ -68,4 +69,5 @@ sha512sums="
 513daca43bfaf4fa23a127ba77d51a9fed4e5a0c736dddf13e6cf36945fda93a1a801c68795bf638e55f9634949c85c166f1213295b55233c6397ad6fbf5ca08  c7dbb0a08424a4fb1c034444b00f10781c4e7108.tar.gz
 bc658dde5dae57471f1899753ed87b3c501a9de29c7038c082b1f8c47a7f5d302fb432960aca95627f2dda36107184c2635f62cb30062c070a9233edc674d308  pvrsrvinit.service
 873ea14a717ad1288455831c1510b5b37cb103451d15d99c5f560b0b8f79dc92cf2207e597c958d1fabe3f05f252251fe557c1af10c1733bfdac6ef66d8b7c90  90-sgx-ddk-um.preset
+7b565374496401f7abaf3dcd5ef8c2bc89f8ceb772b2fb848f59f32462bbbb065263944b1e9db5d83313de0bbbc839fac1b39307a309061ce44538ac92340d39  dbm-dumb-buffers-with-4096-byte-rows.patch
 "

@@ -1,0 +1,32 @@
+From: pmos-galaxy
+Subject: [PATCH] dbm: create dumb buffers with 4096-byte rows
+
+buffer_create() asked for height=size, width=1, bpp=8. omapdrm pads the
+pitch to at least 8 bytes, so every buffer was 8x its size (4 MB -> 32 MB
+for 1280x800 XRGB). Two triple-buffered window surfaces then exhausted the
+SGX's VMArena ("MMU_Alloc: RA_Alloc of VMArena failed"), and mutter's
+second surface got no colour buffer: GNOME rendered nothing. Use 4096-byte
+rows; the overshoot is below one row.
+---
+--- a/dbm/dbm.c	2026-11-20 23:16:16.097022436 +0000
++++ b/dbm/dbm.c	2026-11-20 23:16:16.173021451 +0000
+@@ -433,10 +433,16 @@
+ 
+   TRACE("%s size %d, flags %x\n", __func__, size, flags);
+ 
++  /*
++   * Ask for 4096-byte rows. A size x 1 x 8bpp request makes drivers that pad
++   * the pitch (omapdrm: at least 8 bytes per row) allocate up to 8x the
++   * size, which exhausts the SGX's device-virtual heap (pmos-galaxy
++   * docs/bringup.md B18).
++   */
+   create_dumb_req.flags = 0;
+-  create_dumb_req.height = size;
+-  create_dumb_req.width = 1;
+-  create_dumb_req.bpp = 8;
++  create_dumb_req.width = 1024;
++  create_dumb_req.bpp = 32;
++  create_dumb_req.height = (size + 4095) / 4096;
+ 
+   if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_dumb_req))
+     return -errno;
