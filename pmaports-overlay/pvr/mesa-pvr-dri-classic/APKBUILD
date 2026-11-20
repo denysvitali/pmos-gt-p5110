@@ -2,7 +2,7 @@
 
 pkgname=mesa-pvr-dri-classic
 pkgver=21.3.9
-pkgrel=55
+pkgrel=56
 pkgdesc="Mesa (Amber) DRI OpenGL library with PowerVR patches"
 url="https://github.com/MightyM17/mesa-pvr/tree/amber-pvr"
 arch="armhf armv7 aarch64"
@@ -65,7 +65,7 @@ source="
 	egl-wayland-pvr-clients-default-to-swrast.patch
 	50-pvr.conf
 	"
-options="!check" # we skip tests intentionally
+options="!check !pmb:crossdirect" # skip tests; crossdirect miscompiles floats (docs/bringup.md B16)
 builddir="$srcdir/mesa-pvr-$_commit"
 
 _dri_driverdir=/usr/lib/xorg/modules/dri

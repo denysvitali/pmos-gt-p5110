@@ -36,6 +36,19 @@ fetch() {
 	echo "$1: $commit"
 }
 
+# crossdirect (native cross gcc inside the armv7 chroot) folds float
+# constants to 0 in armv7 userspace (docs/bringup.md B16). Every overlay
+# package must build in QEMU (!pmb:crossdirect) or be pmb:cross-native.
+bad=0
+for a in $(find "$root/pmaports-overlay" -name APKBUILD); do
+	o=$(sed -n 's/^options="\([^"]*\)".*/\1/p' "$a")
+	case " $o " in
+	*" !pmb:crossdirect "* | *" pmb:cross-native "*) ;;
+	*) echo "ERROR: $a: options=\"$o\" lacks !pmb:crossdirect" >&2; bad=1 ;;
+	esac
+done
+[ "$bad" = 0 ] || exit 1
+
 mkdir -p "$work" "$out"
 fetch pmbootstrap
 fetch pmaports

@@ -2,12 +2,12 @@
 pkgname=sgx-ddk-um
 pkgver=1.17.4948957
 _commit=c7dbb0a08424a4fb1c034444b00f10781c4e7108
-pkgrel=50
+pkgrel=51
 pkgdesc="(WARNING: runs as root) Proprietary userspace libraries for PowerVR SGX GPUs"
 url="https://git.ti.com/cgit/graphics/omap5-sgx-ddk-um-linux"
 arch="armhf armv7 aarch64"
 license="proprietary"
-options="!check !strip !tracedeps" # no test suite available
+options="!check !strip !tracedeps !pmb:crossdirect" # no tests; crossdirect miscompiles floats (docs/bringup.md B16)
 makedepends="autoconf automake m4 libtool mesa-pvr-dri-classic-dev libdrm-dev"
 depends="libc6-compat gcompat"
 subpackages="

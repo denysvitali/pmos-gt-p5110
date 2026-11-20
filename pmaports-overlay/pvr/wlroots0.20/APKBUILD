@@ -44,7 +44,7 @@ source="https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/$_pkgver/wlroot
 	render-gles2-support-PowerVR-SGX.patch
 	"
 builddir="$srcdir/wlroots-$_pkgver"
-options="!check !pmb:crossdirect" # no test suite; crossdirect miscompiles floats (B16)
+options="!check !pmb:crossdirect" # no test suite; crossdirect miscompiles floats (docs/bringup.md B16)
 
 # whether this is the default version (latest stable wlroots)
 _default="yes"

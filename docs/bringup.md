@@ -654,3 +654,12 @@ clients broken, GTK clients software-rendered.
   commits in two 60 s runs (~13–15 fps), 0 protocol errors, cage rc=0.
 - Native mesa-pvr build started, to test whether the GNOME crash is the same
   miscompilation.
+- **Cause isolated to crossdirect** [verified]: the same CI with only
+  `options="!pmb:crossdirect"` added (wlroots0.20 r51, run 44657025888, QEMU-only
+  build) stores `mov.w r3,#0x3f800000; str r3,[r4,#0x5c]` in wlr_output_init.
+  Control, CI r50 (crossdirect), with the same `llvm-objdump` command: `movs r3,#0x0`.
+  Why crossdirect's compiler does this was not investigated [unknown].
+- Fix: every overlay userspace APKBUILD carries `!pmb:crossdirect` (mesa-pvr r56,
+  sgx-ddk-um r51, wlroots0.20 r51). `scripts/ci/build.sh` fails at the start if
+  any overlay APKBUILD lacks it and is not `pmb:cross-native`. The guard failed on
+  the unfixed mesa and sgx APKBUILDs [verified locally].
