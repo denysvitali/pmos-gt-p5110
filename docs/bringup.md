@@ -733,3 +733,8 @@ clients broken, GTK clients software-rendered.
   plain-texture FBO, then free everything), k (j + glFinish) and m (j, image
   kept) all pass, 2 runs each [verified]. mutter's real sequence is unknown;
   r59 logs it (`PVR_FBO_DEFER_DEBUG=1`).
+- Kernel r57 (DT `summit,usb-current-limit-microamp = <1800000>`, checked in the
+  shipped dtb with `dtc`) installed with `kernel-ab` (A=r57, B=r56), on a wall
+  charger [verified]. After boot, with no manual write, the chip reads
+  `0x01=0x66 CFG_PIN=0x04 CMD_A=0x02 CMD_B=0x03 STAT_C=0x05`. Net +0.76–0.81 A
+  with GNOME running at backlight 3/7, 25 %. Wi-Fi up.
