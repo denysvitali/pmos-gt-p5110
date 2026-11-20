@@ -774,3 +774,15 @@ clients broken, GTK clients software-rendered.
 - Leak: the long-lived FBO 350005 draws every client buffer, so r61 keeps one
   image texture (and its __DRIimage) per client run: 7 pending after 7 runs
   [verified].
+- **r62 (aging after 120 draws) + animations off: 8/8 pass** [verified]. Hardware
+  EGL in every run, 1105–1142 commits per 20 s, same shell PID, D-Bus answering,
+  no new coredump. Leak bounded: 9 deferred, 6 released by aging, 3 pending
+  (the last runs). Stopping GDM (deletes the long-lived FBO) did not crash,
+  unlike before [verified].
+- Not fixed: with window animations on, the per-window offscreen FBOs still
+  crash on a transitive dependency (r61 run, `delete-fbo 2030029`). The kiosk
+  dconf (`tablet-tune.sh`) sets `enable-animations=false`.
+- Power key: each press arrives twice, from `gpio-keys` (its DT `key-power`, GPIO,
+  KEY_POWER, wakeup-source) and from `twl4030_pwrbutton` (0016). GNOME blanks
+  and unblanks on one press [verified, journal]. B13's "no power-key input
+  device" missed gpio-keys' own power key.
