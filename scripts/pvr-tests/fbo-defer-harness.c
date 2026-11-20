@@ -7,6 +7,12 @@ typedef unsigned GLenum; typedef unsigned GLuint; typedef int GLint; typedef int
 typedef void (*_glapi_proc)(void);
 typedef enum { PVRDRI_API_GLES1 = 2, PVRDRI_API_GLES2 = 3 } PVRDRIAPIType;
 typedef struct { int dummy; } PVRDRIContext;
+typedef struct { int refs; } __DRIimage;
+static __DRIimage *cur_image;  /* what the fake lookup returns */
+static char ulog[256];
+static __DRIimage *PVRDRIScreenGetDRIImage(void *h) { (void)h; return cur_image; }
+static void PVRDRIRefImage(__DRIimage *i) { i->refs++; }
+static void PVRDRIUnrefImage(__DRIimage *i) { i->refs--; sprintf(ulog + strlen(ulog), "U%d ", i->refs); }
 /* wrap_block.c: the workaround block cut out of the patched mesa_context.c */
 #include "wrap_block.c"
 /* fake GL */
@@ -72,5 +78,22 @@ int main(void) {
 	bound_tex = 20; img(0x0DE1, NULL); active(0x84C0); bindtex(0x0DE1, 20);
 	bindfb(0x8D40, 30); delfbo(1, &f30); log_[0] = 0; drawa(5, 0, 4);
 	deltex(1, &t20); CHECK("T20 ");
+	/* __DRIimage references */
+	__DRIimage ia = { 1 }, ib = { 1 };                  /* 1 = mutter's own reference */
+	GLuint t40 = 40, f50 = 50;
+	gpvCurCtx = &c1; cur_image = &ia; bound_tex = 40; img(0x0DE1, NULL);
+	printf("ref at bind: %s\n", ia.refs == 2 ? "ok" : "FAIL"); fails += ia.refs != 2;
+	cur_image = &ib; img(0x0DE1, NULL);                /* re-target tex 40 to image b */
+	printf("re-target swaps refs: %s\n", ia.refs == 1 && ib.refs == 2 ? "ok" : "FAIL"); fails += !(ia.refs == 1 && ib.refs == 2);
+	bindfb(0x8D40, 50); active(0x84C0); bindtex(0x0DE1, 40); drawa(5, 0, 4);
+	deltex(1, &t40); CHECK("");
+	ib.refs--;                                         /* mutter: eglDestroyImage */
+	printf("held while deferred: %s\n", ib.refs == 1 ? "ok" : "FAIL"); fails += ib.refs != 1;
+	ulog[0] = 0; delfbo(1, &f50); CHECK("F50 T40 ");
+	printf("released after delete: %s [%s]\n", ib.refs == 0 && !strcmp(ulog, "U0 ") ? "ok" : "FAIL", ulog); fails += !(ib.refs == 0 && !strcmp(ulog, "U0 "));
+	/* unreferenced image texture: released right after its delete */
+	__DRIimage ic = { 1 }; GLuint t41 = 41; cur_image = &ic; bound_tex = 41; img(0x0DE1, NULL);
+	bindfb(0x8D40, 0); ulog[0] = 0; deltex(1, &t41); CHECK("T41 ");
+	printf("released on plain delete: %s\n", ic.refs == 1 && !strcmp(ulog, "U1 ") ? "ok" : "FAIL"); fails += !(ic.refs == 1 && !strcmp(ulog, "U1 "));
 	printf("%s\n", fails ? "FAILURES" : "all ok"); return fails;
 }

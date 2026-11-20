@@ -18,10 +18,15 @@ glBindTexture, glBindFramebuffer, glDrawArrays, glDrawElements,
 glDeleteTextures and glDeleteFramebuffers in the GLES2 dispatch table. An FBO
 references an EGLImage texture that is attached to it or bound on a unit
 during a draw into it. Such a texture is really deleted only after every FBO
-of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
+of the current context that references it.
+
+Deferring the texture alone is not enough (r60 still crashed): the blob
+texture does not keep the image's buffer alive, so eglDestroyImage freed the
+memory and its sync anyway. Each image texture now also holds a __DRIimage
+reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 ---
 --- a/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 09:02:48.952794941 +0000
-+++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 11:08:02.499598072 +0000
++++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 11:48:04.384275459 +0000
 @@ -34,8 +34,11 @@
   */
  
@@ -34,7 +39,7 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
  
  #include "main/version.h"
  #include "main/errors.h"
-@@ -145,6 +148,441 @@
+@@ -145,6 +148,480 @@
  	}
  }
  
@@ -52,7 +57,10 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 + * the texture is attached to it or bound on a unit during a draw into it.
 + *
 + * The real deletion of an EGLImage texture referenced by a still-live FBO of
-+ * this context is deferred until those FBOs are deleted.
++ * this context is deferred until those FBOs are deleted. The blob texture does
++ * not keep the image's buffer alive, so each image texture also holds a
++ * __DRIimage reference until its real deletion; otherwise eglDestroyImage
++ * frees the memory (and its sync) under the deferred texture.
 + */
 +typedef void (*pvr_delete_fn)(GLsizei, const GLuint *);
 +typedef void (*pvr_fbtex_fn)(GLenum, GLenum, GLenum, GLuint, GLint);
@@ -68,7 +76,7 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +struct pvr_ctx_state { void *ctx; GLuint fbo; GLuint unit; GLuint tex[PVR_MAX_UNITS]; };
 +
 +struct pvr_fbo_att { void *ctx; GLuint fbo; GLuint tex; };
-+struct pvr_img_tex { void *ctx; GLuint tex; int deferred; };
++struct pvr_img_tex { void *ctx; GLuint tex; int deferred; __DRIimage *psDRIImage; };
 +
 +static pthread_mutex_t gsWrapLock = PTHREAD_MUTEX_INITIALIZER;
 +static __thread void *gpvCurCtx;
@@ -114,9 +122,13 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +	return 0;
 +}
 +
-+static void pvr_drop_img(struct pvr_img_tex *psImg)
++/* Remove an entry; returns its image reference for the caller to drop. */
++static __DRIimage *pvr_drop_img(struct pvr_img_tex *psImg)
 +{
++	__DRIimage *psDRIImage = psImg->psDRIImage;
++
 +	*psImg = gpsImg[--guImg];
++	return psDRIImage;
 +}
 +
 +/* The calling thread's context state; created on first use. Lock held. */
@@ -233,19 +245,22 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +static void
 +wrap_EGLImageTargetTexture2DOES(GLenum target, void *image)
 +{
++	struct pvr_img_tex *psImg;
++	__DRIimage *psDRIImage, *psOld = NULL;
 +	GLint tex = 0;
 +
 +	real_EGLImageTargetTexture2DOES(target, image);
 +	if (real_GetIntegerv)
 +		real_GetIntegerv(PVR_TEXTURE_BINDING_2D, &tex);
-+	PVR_DBG("ctx %p image-target target %#x tex %d\n", gpvCurCtx, target, tex);
-+	if (target != PVR_TEXTURE_2D || !real_GetIntegerv)
-+		return;
-+	if (tex == 0)
++	psDRIImage = PVRDRIScreenGetDRIImage(image);
++	PVR_DBG("ctx %p image-target target %#x tex %d image %p\n", gpvCurCtx, target,
++		tex, (void *)psDRIImage);
++	if (target != PVR_TEXTURE_2D || !real_GetIntegerv || tex == 0)
 +		return;
 +
 +	pthread_mutex_lock(&gsWrapLock);
-+	if (!pvr_find_img(tex))
++	psImg = pvr_find_img(tex);
++	if (!psImg)
 +	{
 +		if (guImg == guImgCap)
 +		{
@@ -256,10 +271,20 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +			gpsImg = pv;
 +			guImgCap = uCap;
 +		}
-+		gpsImg[guImg++] = (struct pvr_img_tex){ gpvCurCtx, tex, 0 };
++		psImg = &gpsImg[guImg++];
++		*psImg = (struct pvr_img_tex){ gpvCurCtx, tex, 0, NULL };
++	}
++	if (psImg->psDRIImage != psDRIImage)
++	{
++		psOld = psImg->psDRIImage;
++		psImg->psDRIImage = psDRIImage;
++		if (psDRIImage)
++			PVRDRIRefImage(psDRIImage);
 +	}
 +out:
 +	pthread_mutex_unlock(&gsWrapLock);
++	if (psOld)
++		PVRDRIUnrefImage(psOld);
 +}
 +
 +static void
@@ -289,16 +314,27 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +	GLuint auStack[16];
 +	GLuint *puKeep = auStack;
 +	GLsizei nKeep = 0;
++	__DRIimage *apsStack[16];
++	__DRIimage **ppsUnref = apsStack;
++	GLsizei nUnref = 0;
 +
 +	if (n <= 0 || !textures)
 +	{
 +		real_DeleteTextures(n, textures);
 +		return;
 +	}
-+	if (n > 16 && !(puKeep = malloc(n * sizeof(*puKeep))))
++	if (n > 16)
 +	{
-+		real_DeleteTextures(n, textures);
-+		return;
++		puKeep = malloc(n * sizeof(*puKeep));
++		ppsUnref = malloc(n * sizeof(*ppsUnref));
++		if (!puKeep || !ppsUnref)
++		{
++			/* No memory to track: delete now, keep the references. */
++			free(puKeep);
++			free(ppsUnref);
++			real_DeleteTextures(n, textures);
++			return;
++		}
 +	}
 +
 +	pthread_mutex_lock(&gsWrapLock);
@@ -322,16 +358,21 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +			psImg->deferred = 1;
 +			continue;
 +		}
-+		if (psImg)
-+			pvr_drop_img(psImg);
++		if (psImg && (ppsUnref[nUnref] = pvr_drop_img(psImg)))
++			nUnref++;
 +		puKeep[nKeep++] = textures[i];
 +	}
 +	pthread_mutex_unlock(&gsWrapLock);
 +
 +	if (nKeep)
 +		real_DeleteTextures(nKeep, puKeep);
++	/* The buffers go only after the textures that used them. */
++	for (GLsizei i = 0; i < nUnref; i++)
++		PVRDRIUnrefImage(ppsUnref[i]);
 +	if (puKeep != auStack)
 +		free(puKeep);
++	if (ppsUnref != apsStack)
++		free(ppsUnref);
 +}
 +
 +static void
@@ -370,10 +411,12 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +		    !pvr_tex_attached(gpsImg[i].tex))
 +		{
 +			GLuint tex = gpsImg[i].tex;
++			__DRIimage *psDRIImage = pvr_drop_img(&gpsImg[i]);
 +
-+			pvr_drop_img(&gpsImg[i]);
 +			PVR_DBG("ctx %p deferred delete-texture %u\n", gpvCurCtx, tex);
 +			real_DeleteTextures(1, &tex);
++			if (psDRIImage)
++				PVRDRIUnrefImage(psDRIImage);
 +		}
 +		else
 +		{
@@ -398,7 +441,8 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
 +	for (unsigned i = 0; i < guImg; )
 +	{
 +		if (gpsImg[i].ctx == psPVRContext)
-+			pvr_drop_img(&gpsImg[i]);
++			(void)pvr_drop_img(&gpsImg[i]); /* the image reference is leaked on purpose:
++							 * share-group textures may still use it */
 +		else
 +			i++;
 +	}
@@ -476,7 +520,7 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
  static void
  pvrdri_add_mesa_dispatch(struct _glapi_table *psTable,
  			 PVRDRIAPIType eAPI,
-@@ -176,6 +614,8 @@
+@@ -176,6 +653,8 @@
  		}
  	}
  
@@ -485,7 +529,7 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
  	asFunc[0] = psFunc;
  	iOffset = _glapi_add_dispatch(asFunc, "");
  	if (iOffset == -1)
-@@ -254,6 +694,7 @@
+@@ -254,6 +733,7 @@
  void
  pvrdri_set_null_dispatch_table(void)
  {
@@ -493,7 +537,7 @@ of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrap
  	_glapi_set_dispatch(NULL);
  }
  
-@@ -262,5 +703,6 @@
+@@ -262,5 +742,6 @@
  {
  	struct _glapi_table *psTable = pvrdri_get_dispatch_table(psPVRContext->psPVRScreen, psPVRContext->eAPI);
  

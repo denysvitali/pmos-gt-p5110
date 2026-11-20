@@ -753,3 +753,12 @@ clients broken, GTK clients software-rendered.
 - r60 also records a reference when a draw into an FBO has an EGLImage texture
   bound on any unit (wraps glActiveTexture/glBindTexture/glBindFramebuffer/
   glDrawArrays/glDrawElements). Harness: 18 checks [verified]. Test bench: GNOME.
+- r60 under GNOME: still SIGSEGV +0x16e6c at `delete-fbo 1890027` [verified]. The
+  log shows the deferral worked: `ref fbo 1890027 tex 3780054 (draw)`, then
+  `delete-texture 3780054 img 1 attached 1` (deferred), then `delete-fbo
+  1890027`. So keeping the GL texture alive does not keep its memory alive
+  [inferred: the blob texture holds no __DRIimage reference]. This fits repro i
+  (image kept alive: OK) vs f (image destroyed: crash).
+- r61: each image texture also holds a __DRIimage reference
+  (`PVRDRIScreenGetDRIImage` + `PVRDRIRefImage`) until its real deletion. Harness:
+  24 checks [verified].
