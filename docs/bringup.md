@@ -663,3 +663,13 @@ clients broken, GTK clients software-rendered.
   sgx-ddk-um r51, wlroots0.20 r51). `scripts/ci/build.sh` fails at the start if
   any overlay APKBUILD lacks it and is not `pmb:cross-native`. The guard failed on
   the unfixed mesa and sgx APKBUILDs [verified locally].
+- Native mesa-pvr r55 on the tablet, GNOME, client with `MESA_PVR_WAYLAND_HW=1
+  MESA_LOADER_DRIVER_OVERRIDE=pvr`: hardware EGL, then mutter rejects the import
+  (`failed to import supplied dmabufs`). That is the B15 modifier problem, expected
+  without the r54 patch [verified]. So r55 cannot test the blob crash. mesa-pvr r57 =
+  r56 (no crossdirect) + the r54 no-modifiers patch, swrast still the default.
+- A boot with native r55 left gnome-shell hung: main thread in a PVR ioctl
+  (`LinuxEventObjectWait`), D-Bus unanswered. The trigger is not known
+  [verified hang, unknown cause]. The next boot was responsive. `MMU_Alloc: RA_Alloc
+  of VMArena failed` (an 11 MB General-heap allocation at shell start) appears
+  on every boot, CI mesa included [verified].

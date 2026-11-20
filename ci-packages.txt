@@ -2,4 +2,3 @@
 # what changed since its last release: a rebuild of an unchanged pkgver/pkgrel
 # publishes a second, different binary under the same version.
 mesa-pvr-dri-classic
-sgx-ddk-um
