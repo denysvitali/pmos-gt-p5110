@@ -626,3 +626,21 @@ clients broken, GTK clients software-rendered.
 - Working configuration (mesa-pvr r55): Wayland EGL clients default to swrast +
   wl_shm (`MESA_PVR_WAYLAND_HW=1` opts back in). mutter (GBM platform) keeps
   the SGX. The no-modifiers patch (r54) was dropped.
+
+## B16 — CI-built userspace has float constants folded to 0, 2026-11-20
+
+- cage under gdb with wlroots0.20-dbg [verified]: the mode is correct (clock 69818,
+  htotal 1408, vtotal 830 → `calculate_refresh_rate` = 59743), yet it prints
+  `inf Hz`. FPSCR is normal (0x20000010: no LEN/STRIDE/RMode). `scale=0` comes
+  from types/scene/surface.c:148.
+- `struct wlr_output.scale` is at offset 92 (ptype /o). In `wlr_output_init`:
+  - Alpine 0.20.2-r0: `mov.w r3, #1065353216 (0x3f800000); str r3, [r4, #92]`
+  - our CI r50:       `movs r3, #0;                       str r3, [r4, #92]`
+  The source has `.scale = 1`. **The CI build folded the float constant to 0**
+  [verified, disassembly of both]. A /1000.0f constant that became 0 gives `inf`.
+- Code compiled natively on the tablet (all test programs) has correct floats
+  [verified]. The kernel is cross-native (no floats) and unaffected. Every
+  non-cross-native CI package is suspect (wlroots0.20 r50, mesa-pvr r51–r55,
+  sgx-ddk-um). The GNOME/SGX crash may share this cause [inferred, testing].
+- Native rebuild on the tablet: `abuild -r` in ~/build (abuild key and group
+  present).
