@@ -783,6 +783,7 @@ clients broken, GTK clients software-rendered.
   crash on a transitive dependency (r61 run, `delete-fbo 2030029`). The kiosk
   dconf (`tablet-tune.sh`) sets `enable-animations=false`.
 - Power key: each press arrives twice, from `gpio-keys` (its DT `key-power`, GPIO,
-  KEY_POWER, wakeup-source) and from `twl4030_pwrbutton` (0016). GNOME blanks
-  and unblanks on one press [verified, journal]. B13's "no power-key input
+  KEY_POWER, wakeup-source) and from `twl4030_pwrbutton` (0016). The duplicate
+  logind lines and the blank/cancel pairs are verified (journal); that both
+  devices emit is inferred (logind watches both). A per-device capture is pending. B13's "no power-key input
   device" missed gpio-keys' own power key.
