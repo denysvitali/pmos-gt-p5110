@@ -1,0 +1,25 @@
+From: pmos-galaxy
+Subject: [PATCH] ARM: dts: omap4: espresso: keep the LCD supply on
+
+When DPMS off releases lcd_en (shared by the LVDS encoder, the panel and the
+backlight), the panel stays black after power-up: backlight on, scanout
+running, also after 5 s off. At boot the supply was never off and the first
+enable works. Keep it on; DPMS off still powers down the encoder (PD pin)
+and the backlight.
+---
+--- a/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso-common.dtsi	2026-11-20 15:19:04.247979899 +0000
++++ b/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso-common.dtsi	2026-11-20 15:19:04.331978807 +0000
+@@ -161,6 +161,13 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		enable-active-high;
+ 		regulator-boot-on;
++		/*
++		 * Keep the panel and LVDS encoder powered: after lcd_en is
++		 * cut on DPMS off, the panel stays black on power-up (backlight
++		 * on, scanout running), even after 5 s off. DPMS off still puts
++		 * the encoder in powerdown and turns the backlight off.
++		 */
++		regulator-always-on;
+ 	};
+ 
+ 	pwm10: pwm-10 {

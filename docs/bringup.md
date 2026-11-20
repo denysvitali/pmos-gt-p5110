@@ -800,3 +800,14 @@ clients broken, GTK clients software-rendered.
   `MESA_PVR_WAYLAND_HW` maps libGLESv2_PVR_MESA (no swrast); `=0` maps swrast_dri
   and no PVR GLES. 8/8 stable with the default: 1125–1141 commits per 20 s,
   same shell PID, D-Bus answering, no new coredump. Debug logging off.
+- Power key after r58 (capture on all event devices, 4 presses) [verified]: one
+  KEY_POWER per press and release, from gpio-keys only.
+- Black screen after a power-key blank/unblank [verified]: backlight on,
+  connector DPMS On, CRTC active, mutter keeps flipping (KMS debug: ~8
+  atomic commits/s alternating FB 71/72, 3 scanout addresses), client frame
+  callbacks continue. The panel shows nothing; 5 s off then on (D-Bus
+  PowerSaveMode 3 → 0) is still black. DT chain: DPI → doestek,dtc34lm85am
+  (lvds-codec, powerdown-gpios + lcd_en) → panel-lvds samsung,ltn101al03; the
+  backlight uses lcd_en too. lvds-codec `enable` turns lcd_en on and releases
+  PD at once. At boot lcd_en was never off. Fix 0017 (kernel r59):
+  `regulator-always-on` on reg_lcd [hypothesis, not yet on hardware].
