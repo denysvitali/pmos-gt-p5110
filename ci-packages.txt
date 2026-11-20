@@ -1,4 +1,4 @@
 # Packages scripts/ci/build.sh rebuilds on push (in this order). Keep only
 # what changed since its last release: a rebuild of an unchanged pkgver/pkgrel
 # publishes a second, different binary under the same version.
-linux-postmarketos-omap
+mesa-pvr-dri-classic
