@@ -2,7 +2,7 @@
 
 pkgname=mesa-pvr-dri-classic
 pkgver=21.3.9
-pkgrel=61
+pkgrel=62
 pkgdesc="Mesa (Amber) DRI OpenGL library with PowerVR patches"
 url="https://github.com/MightyM17/mesa-pvr/tree/amber-pvr"
 arch="armhf armv7 aarch64"
@@ -143,6 +143,6 @@ c5d215a24369a1adc27c3b457bac7e40710d198b59ea263274c0361a485a64408f7b73cd291087f1
 6c6498bf7e9cc3b1a60a0861cdf4ec6f9aa920223b2f99269cfe884ca8063689f9b95e165782e6f6ba3fec283ae6aa5ac38dd8066f467c4367818e31f0bd1dff  Fix-meson-build-system-and-build-pvr-driver.patch
 9f6388886b0e17fdf5df7896ca43d1174dfb6283bbf359c71e6213c7c35ed29a28ef6179ca707515f11f47d2f8553204c432ff64136366649c675e7edc941f34  egl-wayland-pvr-clients-default-to-swrast.patch
 5432e2319f5462c60f6d3e6fd9038b11ef30d4c5e3779607954c2308226290fab80acd4262e5e2af6de6281a3ee2937c6745c24dfef682449080498408bd213a  egl-pvr-do-not-advertise-dma-buf-import-modifiers.patch
-0fa3732ac3a9b4701b66ed0c09f96f66c386b7efd799b1bd501ec7165e0e3f864e192861b0c1df83d3490a485dddf233311e6d0d0ba661db9a474ca6792b829b  pvr-defer-eglimage-texture-delete-until-fbo-delete.patch
+083e38f5ffbca95c5a3a672f4356dd60da4046db4f667aeb21018a4f0651d0fbbc80cb51086bd748761b99f70c923b8e79533fb21299e126ad47c45a8c9f0f70  pvr-defer-eglimage-texture-delete-until-fbo-delete.patch
 af8169bfbb51eef4db79253648d74a2458e89cd53a3a6718d3163014d99ba7de29865cbecf6faf5a9ac3397651c2ba7b927d78a8b7d8d439628d634ebe382577  50-pvr.conf
 "

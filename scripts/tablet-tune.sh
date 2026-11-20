@@ -39,6 +39,11 @@ idle-delay=uint32 0
 lock-enabled=false
 idle-activation-enabled=false
 
+[org/gnome/desktop/interface]
+# Window animations render clients through per-window offscreen FBOs that
+# crash the SGX blob when a hardware EGL client exits (docs/bringup.md B17).
+enable-animations=false
+
 [org/gnome/settings-daemon/plugins/power]
 # GNOME Mobile maps 'nothing' to its 'blank' action: the power key turns the
 # screen off and the next press turns it on. 'suspend' does nothing here (sleep

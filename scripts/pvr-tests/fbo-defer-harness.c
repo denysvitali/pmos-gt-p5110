@@ -95,5 +95,19 @@ int main(void) {
 	__DRIimage ic = { 1 }; GLuint t41 = 41; cur_image = &ic; bound_tex = 41; img(0x0DE1, NULL);
 	bindfb(0x8D40, 0); ulog[0] = 0; deltex(1, &t41); CHECK("T41 ");
 	printf("released on plain delete: %s\n", ic.refs == 1 && !strcmp(ulog, "U1 ") ? "ok" : "FAIL"); fails += !(ic.refs == 1 && !strcmp(ulog, "U1 "));
+	/* aging: a long-lived FBO releases a deferred texture after PVR_RELEASE_DRAWS draws */
+	__DRIimage id = { 1 }; GLuint t60 = 60, t61 = 61;
+	cur_image = &id; bound_tex = 60; img(0x0DE1, NULL);
+	bindfb(0x8D40, 70); active(0x84C0); bindtex(0x0DE1, 60); drawa(5, 0, 4);
+	deltex(1, &t60); CHECK("");                          /* deferred */
+	id.refs--;                                           /* mutter: eglDestroyImage */
+	bindtex(0x0DE1, 61);                                  /* plain texture from now on */
+	bindfb(0x8D40, 71); for (int i = 0; i < 300; i++) drawa(5, 0, 4);  /* other fbo: no aging */
+	CHECK(""); bindfb(0x8D40, 70);
+	for (int i = 0; i < PVR_RELEASE_DRAWS - 1; i++) drawa(5, 0, 4);
+	printf("held after %d draws: %s\n", PVR_RELEASE_DRAWS - 1, id.refs == 1 && !log_[0] ? "ok" : "FAIL"); fails += !(id.refs == 1 && !log_[0]);
+	ulog[0] = 0; drawa(5, 0, 4); CHECK("T60 ");
+	printf("released at %d: %s [%s]\n", PVR_RELEASE_DRAWS, id.refs == 0 && !strcmp(ulog, "U0 ") ? "ok" : "FAIL", ulog); fails += !(id.refs == 0 && !strcmp(ulog, "U0 "));
+	deltex(1, &t61); CHECK("T61 ");
 	printf("%s\n", fails ? "FAILURES" : "all ok"); return fails;
 }

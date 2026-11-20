@@ -23,10 +23,14 @@ of the current context that references it.
 Deferring the texture alone is not enough (r60 still crashed): the blob
 texture does not keep the image's buffer alive, so eglDestroyImage freed the
 memory and its sync anyway. Each image texture now also holds a __DRIimage
-reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
+reference until its real deletion.
+
+A long-lived FBO (the stage view) draws every client buffer and is never
+deleted, so a reference from an FBO to a deferred texture is also dropped
+after 120 further draws into that FBO. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 ---
 --- a/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 09:02:48.952794941 +0000
-+++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 11:48:04.384275459 +0000
++++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 12:32:44.669566779 +0000
 @@ -34,8 +34,11 @@
   */
  
@@ -39,7 +43,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
  
  #include "main/version.h"
  #include "main/errors.h"
-@@ -145,6 +148,480 @@
+@@ -145,6 +148,518 @@
  	}
  }
  
@@ -61,6 +65,11 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
 + * not keep the image's buffer alive, so each image texture also holds a
 + * __DRIimage reference until its real deletion; otherwise eglDestroyImage
 + * frees the memory (and its sync) under the deferred texture.
++ *
++ * A long-lived FBO (the stage view) draws every client buffer and is never
++ * deleted, which would keep every buffer forever. A reference from an FBO to a
++ * deferred texture is therefore also dropped after PVR_RELEASE_DRAWS further
++ * draws into that FBO, which replace what it depends on.
 + */
 +typedef void (*pvr_delete_fn)(GLsizei, const GLuint *);
 +typedef void (*pvr_fbtex_fn)(GLenum, GLenum, GLenum, GLuint, GLint);
@@ -75,7 +84,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
 +/* Bindings as the application set them, per context. */
 +struct pvr_ctx_state { void *ctx; GLuint fbo; GLuint unit; GLuint tex[PVR_MAX_UNITS]; };
 +
-+struct pvr_fbo_att { void *ctx; GLuint fbo; GLuint tex; };
++struct pvr_fbo_att { void *ctx; GLuint fbo; GLuint tex; unsigned draws; };
 +struct pvr_img_tex { void *ctx; GLuint tex; int deferred; __DRIimage *psDRIImage; };
 +
 +static pthread_mutex_t gsWrapLock = PTHREAD_MUTEX_INITIALIZER;
@@ -102,6 +111,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
 +	if (giDebug) fprintf(stderr, "pvr-fbo-defer: " __VA_ARGS__); \
 +} while (0)
 +
++#define PVR_RELEASE_DRAWS 120
 +#define PVR_TEXTURE_2D 0x0DE1
 +#define PVR_TEXTURE_BINDING_2D 0x8069
 +#define PVR_FRAMEBUFFER_BINDING 0x8CA6
@@ -169,7 +179,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
 +		gpsAtt = pv;
 +		guAttCap = uCap;
 +	}
-+	gpsAtt[guAtt++] = (struct pvr_fbo_att){ gpvCurCtx, fbo, tex };
++	gpsAtt[guAtt++] = (struct pvr_fbo_att){ gpvCurCtx, fbo, tex, 0 };
 +	PVR_DBG("ctx %p ref fbo %u tex %u (%s)\n", gpvCurCtx, fbo, tex, why);
 +}
 +
@@ -214,17 +224,66 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
 +	pthread_mutex_unlock(&gsWrapLock);
 +}
 +
-+/* A draw into an FBO references the image textures bound on any unit. */
++/* Really delete deferred textures that no FBO references any more. Lock held. */
++static void pvr_release_unreferenced(void)
++{
++	for (unsigned i = 0; i < guImg; )
++	{
++		if (gpsImg[i].ctx == gpvCurCtx && gpsImg[i].deferred &&
++		    !pvr_tex_attached(gpsImg[i].tex))
++		{
++			GLuint tex = gpsImg[i].tex;
++			__DRIimage *psDRIImage = pvr_drop_img(&gpsImg[i]);
++
++			PVR_DBG("ctx %p deferred delete-texture %u\n", gpvCurCtx, tex);
++			real_DeleteTextures(1, &tex);
++			if (psDRIImage)
++				PVRDRIUnrefImage(psDRIImage);
++		}
++		else
++		{
++			i++;
++		}
++	}
++}
++
++/*
++ * A draw into an FBO references the image textures bound on any unit, and
++ * ages its references to deferred (deleted) textures.
++ */
 +static void pvr_note_draw(void)
 +{
 +	struct pvr_ctx_state *psState;
++	int bAged = 0;
 +
 +	pthread_mutex_lock(&gsWrapLock);
 +	psState = pvr_state();
 +	if (psState && psState->fbo && guImg)
++	{
 +		for (unsigned u = 0; u < PVR_MAX_UNITS; u++)
 +			if (psState->tex[u] && pvr_find_img(psState->tex[u]))
 +				pvr_add_ref(psState->fbo, psState->tex[u], "draw");
++		for (unsigned i = 0; i < guAtt; )
++		{
++			struct pvr_img_tex *psImg;
++
++			if (gpsAtt[i].ctx == gpvCurCtx && gpsAtt[i].fbo == psState->fbo &&
++			    (psImg = pvr_find_img(gpsAtt[i].tex)) && psImg->deferred &&
++			    ++gpsAtt[i].draws >= PVR_RELEASE_DRAWS)
++			{
++				PVR_DBG("ctx %p aged ref fbo %u tex %u\n", gpvCurCtx,
++					gpsAtt[i].fbo, gpsAtt[i].tex);
++				gpsAtt[i] = gpsAtt[--guAtt];
++				bAged = 1;
++			}
++			else
++			{
++				i++;
++			}
++		}
++		if (bAged)
++			pvr_release_unreferenced();
++	}
 +	pthread_mutex_unlock(&gsWrapLock);
 +}
 +
@@ -405,24 +464,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
 +		else
 +			i++;
 +	}
-+	for (unsigned i = 0; i < guImg; )
-+	{
-+		if (gpsImg[i].ctx == gpvCurCtx && gpsImg[i].deferred &&
-+		    !pvr_tex_attached(gpsImg[i].tex))
-+		{
-+			GLuint tex = gpsImg[i].tex;
-+			__DRIimage *psDRIImage = pvr_drop_img(&gpsImg[i]);
-+
-+			PVR_DBG("ctx %p deferred delete-texture %u\n", gpvCurCtx, tex);
-+			real_DeleteTextures(1, &tex);
-+			if (psDRIImage)
-+				PVRDRIUnrefImage(psDRIImage);
-+		}
-+		else
-+		{
-+			i++;
-+		}
-+	}
++	pvr_release_unreferenced();
 +	pthread_mutex_unlock(&gsWrapLock);
 +}
 +
@@ -520,7 +562,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
  static void
  pvrdri_add_mesa_dispatch(struct _glapi_table *psTable,
  			 PVRDRIAPIType eAPI,
-@@ -176,6 +653,8 @@
+@@ -176,6 +691,8 @@
  		}
  	}
  
@@ -529,7 +571,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
  	asFunc[0] = psFunc;
  	iOffset = _glapi_add_dispatch(asFunc, "");
  	if (iOffset == -1)
-@@ -254,6 +733,7 @@
+@@ -254,6 +771,7 @@
  void
  pvrdri_set_null_dispatch_table(void)
  {
@@ -537,7 +579,7 @@ reference until its real deletion. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call
  	_glapi_set_dispatch(NULL);
  }
  
-@@ -262,5 +742,6 @@
+@@ -262,5 +780,6 @@
  {
  	struct _glapi_table *psTable = pvrdri_get_dispatch_table(psPVRContext->psPVRScreen, psPVRContext->eAPI);
  
