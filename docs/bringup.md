@@ -811,3 +811,28 @@ clients broken, GTK clients software-rendered.
   backlight uses lcd_en too. lvds-codec `enable` turns lcd_en on and releases
   PD at once. At boot lcd_en was never off. Fix 0017 (kernel r59):
   `regulator-always-on` on reg_lcd [hypothesis, not yet on hardware].
+
+## B18 — GNOME shows nothing; reboot loop from a flat battery, 2026-11-20
+
+- Scanout reader (`/dev/mem`, address from `/sys/kernel/debug/dri/0/fb`). Positive
+  control [verified]: the fbcon buffer (TILER aperture 0x7f9c0000) reads `aaaaaa`
+  text pixels where the console is visible, and the user saw that console.
+- GNOME's scanout buffers are all `00000000` (alpha included), with clients
+  running, under the user session and under the greeter [verified]. cage +
+  es2gears on the same boot reads gears colours on `000000ff` [verified]. So the
+  panel and GPU→scanout path work; mutter's frames are never written.
+- Not fixed by (each: reboot + read) [verified]: mesa r57 (no wrapper), sgx-ddk-um r50,
+  mesa r51 (old crossdirect build), kernel r56, enable-animations true,
+  MUTTER_DEBUG_FORCE_KMS_MODE=simple (greeter), power profile already balanced.
+  mutter's backend lines are identical to 11-19 boots. The 11 MB MMU_Alloc
+  failure at shell start also happened on 11-19 boot -37. Whether GNOME on PVR
+  ever showed content is not established: earlier "works" reports could have
+  been the backlight [unknown].
+- The software-rendering control did not run: the override comes from both
+  `/usr/lib/environment.d/50-pvr.conf` and `/etc/profile.d/mesa.sh`, and the
+  boot with both moved away never got to a user session (flat battery, below).
+- Reboot loop [verified]: 8 %, 3.04 V, −1.37 A on the wall charger, six boots in
+  eight minutes (40–70 s each). Cause: kernel r56 in slot A for the bisect (900 mA
+  input limit), the backlight left at 7, hours of GPU tests. Rescue: GDM masked,
+  `charge-rescue.service` (backlight 0, SMB347 input 1.8 A at boot) → +0.9–1.36 A
+  at 8 % [verified]. Both env files restored.
