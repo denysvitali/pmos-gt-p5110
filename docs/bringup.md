@@ -795,3 +795,8 @@ clients broken, GTK clients software-rendered.
 - mesa-pvr r63: Wayland EGL clients use the SGX by default (user decision, with
   animations off in the kiosk). `MESA_PVR_WAYLAND_HW=0` falls back to swrast +
   wl_shm (`egl-wayland-pvr-clients-swrast-opt-out.patch`).
+- Kernel r58 + mesa-pvr r63, fresh boot [verified]: input devices are gpio-keys,
+  touchscreen and vibrator (no twl4030_pwrbutton). A client with no
+  `MESA_PVR_WAYLAND_HW` maps libGLESv2_PVR_MESA (no swrast); `=0` maps swrast_dri
+  and no PVR GLES. 8/8 stable with the default: 1125–1141 commits per 20 s,
+  same shell PID, D-Bus answering, no new coredump. Debug logging off.
