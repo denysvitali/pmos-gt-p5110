@@ -715,3 +715,9 @@ clients broken, GTK clients software-rendered.
   the Pi port and browned out once (boot-ROM loop ~17 min). Backlight 0 gives
   +0.40 A [verified]. SMB347 had reverted to `CMD_A=0x02 CFG_PIN=0x04` after VBUS
   loss. Rewriting the stock values changed nothing measurable [verified].
+- Charger on a wall supply (r56 kernel driver), 15 %, GNOME stopped, screen off
+  [verified]: the driver state (`CFG_PIN=0x04 CMD_A=0x02 CMD_B=0x03`) with the DT's
+  900 mA limit (`0x01=0x63`) nets +0.38–0.41 A. With 1.8 A (`0x01=0x66`, SMB347
+  `icl_tbl` index 6) it nets +0.67–0.80 A. CFG_PIN `0x60` vs `0x04` changes
+  nothing at the same limit. 900 mA stays the DT value because a Pi 4 port trips
+  at 1.8 A (B9). Right after the replug it netted +0.02 A; the cause is unknown.
