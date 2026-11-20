@@ -1,0 +1,140 @@
+From: Denys Vitali <denys@denv.it>
+Subject: [PATCH] render/gles2: support PowerVR SGX (no GL_EXT_unpack_subimage)
+
+The SGX540 GLES2 blob lacks GL_EXT_unpack_subimage, so the renderer refused to
+start. Make it optional: upload tightly packed damage rects directly and
+others row by row. Also enable EXT_read_format_bgra for PowerVR SGX, which
+reads BGRA without advertising it (quirk from PVRports' phoc patches).
+---
+diff -ru a/include/render/gles2.h b/include/render/gles2.h
+--- a/include/render/gles2.h	2026-07-07 21:46:09.000000000 +0000
++++ b/include/render/gles2.h	2026-11-20 00:03:41.939555265 +0000
+@@ -48,6 +48,7 @@
+ 	const char *exts_str;
+ 	struct {
+ 		bool EXT_read_format_bgra;
++		bool EXT_unpack_subimage;
+ 		bool KHR_debug;
+ 		bool OES_egl_image_external;
+ 		bool OES_egl_image;
+diff -ru a/render/gles2/renderer.c b/render/gles2/renderer.c
+--- a/render/gles2/renderer.c	2026-07-07 21:46:09.000000000 +0000
++++ b/render/gles2/renderer.c	2026-11-20 00:03:52.819411831 +0000
+@@ -5,6 +5,7 @@
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <time.h>
+ #include <unistd.h>
+ #include <wayland-server-protocol.h>
+@@ -551,14 +552,25 @@
+ 		free(renderer);
+ 		return NULL;
+ 	}
+-	if (!check_gl_ext(exts_str, "GL_EXT_unpack_subimage")) {
+-		wlr_log(WLR_ERROR, "GL_EXT_unpack_subimage not supported");
+-		free(renderer);
+-		return NULL;
++	/* PowerVR SGX lacks GL_EXT_unpack_subimage: texture uploads fall back to
++	 * row-by-row in texture.c. */
++	renderer->exts.EXT_unpack_subimage =
++		check_gl_ext(exts_str, "GL_EXT_unpack_subimage");
++	if (!renderer->exts.EXT_unpack_subimage) {
++		wlr_log(WLR_INFO, "GL_EXT_unpack_subimage not supported, uploading rows");
+ 	}
+ 
+ 	renderer->exts.EXT_read_format_bgra =
+ 		check_gl_ext(exts_str, "GL_EXT_read_format_bgra");
++	/* PowerVR SGX reads BGRA without advertising it (from PVRports). */
++	const char *gl_vendor = (const char *)glGetString(GL_VENDOR);
++	const char *gl_renderer = (const char *)glGetString(GL_RENDERER);
++	if (!renderer->exts.EXT_read_format_bgra && gl_vendor && gl_renderer &&
++			strcmp(gl_vendor, "Imagination Technologies") == 0 &&
++			strncmp(gl_renderer, "PowerVR SGX", 11) == 0) {
++		wlr_log(WLR_INFO, "Enabling EXT_read_format_bgra quirk for PowerVR SGX");
++		renderer->exts.EXT_read_format_bgra = true;
++	}
+ 
+ 	renderer->exts.EXT_texture_type_2_10_10_10_REV =
+ 		check_gl_ext(exts_str, "GL_EXT_texture_type_2_10_10_10_REV");
+diff -ru a/render/gles2/texture.c b/render/gles2/texture.c
+--- a/render/gles2/texture.c	2026-07-07 21:46:09.000000000 +0000
++++ b/render/gles2/texture.c	2026-11-20 00:03:41.939555265 +0000
+@@ -78,20 +78,37 @@
+ 
+ 	for (int i = 0; i < rects_len; i++) {
+ 		pixman_box32_t rect = rects[i];
+-
+-		glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / drm_fmt->bytes_per_block);
+-		glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, rect.x1);
+-		glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, rect.y1);
+-
+ 		int width = rect.x2 - rect.x1;
+ 		int height = rect.y2 - rect.y1;
+-		glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x1, rect.y1, width, height,
+-			fmt->gl_format, fmt->gl_type, data);
++
++		if (texture->renderer->exts.EXT_unpack_subimage) {
++			glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / drm_fmt->bytes_per_block);
++			glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, rect.x1);
++			glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, rect.y1);
++			glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x1, rect.y1, width, height,
++				fmt->gl_format, fmt->gl_type, data);
++			continue;
++		}
++
++		/* No GL_EXT_unpack_subimage: GL reads tightly packed rows. */
++		const uint8_t *src = (const uint8_t *)data +
++			(size_t)rect.y1 * stride + (size_t)rect.x1 * drm_fmt->bytes_per_block;
++		if ((uint32_t)width * drm_fmt->bytes_per_block == stride) {
++			glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x1, rect.y1, width, height,
++				fmt->gl_format, fmt->gl_type, src);
++		} else {
++			for (int y = 0; y < height; y++, src += stride) {
++				glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x1, rect.y1 + y, width, 1,
++					fmt->gl_format, fmt->gl_type, src);
++			}
++		}
+ 	}
+ 
+-	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+-	glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
+-	glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
++	if (texture->renderer->exts.EXT_unpack_subimage) {
++		glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
++		glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
++		glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
++	}
+ 
+ 	glBindTexture(GL_TEXTURE_2D, 0);
+ 
+@@ -342,10 +359,24 @@
+ 
+ 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+ 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+-	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / drm_fmt->bytes_per_block);
+-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
+-		fmt->gl_format, fmt->gl_type, data);
+-	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
++	if (renderer->exts.EXT_unpack_subimage) {
++		glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / drm_fmt->bytes_per_block);
++		glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
++			fmt->gl_format, fmt->gl_type, data);
++		glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
++	} else if (width * drm_fmt->bytes_per_block == stride) {
++		glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
++			fmt->gl_format, fmt->gl_type, data);
++	} else {
++		/* No GL_EXT_unpack_subimage: allocate, then upload row by row. */
++		glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
++			fmt->gl_format, fmt->gl_type, NULL);
++		const uint8_t *src = data;
++		for (uint32_t y = 0; y < height; y++, src += stride) {
++			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y, width, 1,
++				fmt->gl_format, fmt->gl_type, src);
++		}
++	}
+ 
+ 	glBindTexture(GL_TEXTURE_2D, 0);
+ 

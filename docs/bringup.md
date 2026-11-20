@@ -595,3 +595,23 @@ clients broken, GTK clients software-rendered.
   `meta_wayland_dma_buf_manager_new` returns NULL without it, so no
   zwp_linux_dmabuf_v1 global, and Mesa clients fall back to wl_drm
   (EGL_WAYLAND_BUFFER_WL import) [verified, mutter source]. Untested.
+- mesa-pvr r54 (no modifiers ext) on hardware: no linux-dmabuf global; es2gears
+  presents through wl_drm, 601 commits / 12 s, no errors [verified]. A second run
+  crashed gnome-shell at the same blob site (+0x16e6c) [verified]. So the import path
+  is not the cause.
+- Full GL-call tracing (dprintf on all 142 blob GL entry points): no crash in 3
+  client runs. It is timing-dependent [verified]. At the first crash the KMS thread
+  was idle in poll(), so no evidence for a KMS-thread race [verified, thread
+  dump]. `MUTTER_DEBUG_KMS_THREAD_TYPE=user` (KMS on the main thread,
+  meta-thread.c wrap_main_context) avoided the crash in 3x40 s but broke the frame
+  clock (`clutter_frame_clock_notify_ready: code should not be reached`, a frame
+  every ~3 s for the whole UI) [verified]. Reverted.
+- The drawn-after-client-exit, stale-name, delete-in-flight repros also do not crash.
+  The GNOME (mutter + SGX blob) crash stays unexplained.
+- Kiosk compositor route (B1 recon target): weston 14 refuses to start: `GL_EXT_unpack_subimage
+  not available` → `failed to initialize egl` [verified; libseat needs seatd,
+  no builtin backend]. cage 0.3.0 links wlroots 0.20, which also hard-requires
+  unpack_subimage. PVRports patched wlroots 0.19 inside phoc. Ported to 0.20.2 as
+  overlay `wlroots0.20` r50 (my own row-upload fallback; PVRports' fallback read an
+  uninitialised pointer), plus their BGRA read quirk. EGL_KHR_platform_gbm is present
+  [verified], so their MESA_platform_gbm patch is not needed.
