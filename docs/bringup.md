@@ -787,3 +787,8 @@ clients broken, GTK clients software-rendered.
   logind lines and the blank/cancel pairs are verified (journal); that both
   devices emit is inferred (logind watches both). A per-device capture is pending. B13's "no power-key input
   device" missed gpio-keys' own power key.
+- Per-device capture (`/dev/input/event0` twl4030_pwrbutton, `event1` gpio-keys;
+  3 presses) [verified]: every press and release arrives on **both**, gpio-keys
+  first, the TWL6032 pwrbutton ~10 ms later. gpio-keys' DT `key-power` is the
+  upstream power key (wakeup-source), so 0016 duplicated it. Dropped 0016
+  (kernel r58).
