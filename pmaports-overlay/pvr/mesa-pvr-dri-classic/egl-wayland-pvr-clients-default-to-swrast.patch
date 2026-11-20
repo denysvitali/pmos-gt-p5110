@@ -1,0 +1,32 @@
+From: Denys Vitali <denys@denv.it>
+Subject: [PATCH] egl/wayland: pvr: clients default to swrast (MESA_PVR_WAYLAND_HW=1 opts in)
+
+On the SGX540, compositors (mutter, via GBM) render fine with the pvr
+driver, but EGL Wayland clients' GPU buffers crash gnome-shell inside the
+closed SGX blob. Make Wayland clients use swrast + wl_shm by default. The GBM
+platform (the compositor) is unaffected.
+---
+--- a/src/egl/drivers/dri2/platform_wayland.c	2026-11-20 00:20:59.633863558 +0000
++++ b/src/egl/drivers/dri2/platform_wayland.c	2026-11-20 00:20:59.733862238 +0000
+@@ -44,6 +44,7 @@
+ #include "loader.h"
+ #include "util/u_vector.h"
+ #include "util/anon_file.h"
++#include "util/debug.h"
+ #include "eglglobals.h"
+ 
+ #include <wayland-egl-backend.h>
+@@ -2151,7 +2152,12 @@
+ EGLBoolean
+ dri2_initialize_wayland(_EGLDisplay *disp)
+ {
+-   if (disp->Options.ForceSoftware)
++   /* pvr: Wayland clients render with swrast and present through wl_shm,
++    * unless MESA_PVR_WAYLAND_HW=1. Client GPU buffers crash compositors inside
++    * the SGX blob (gnome-shell, libGLESv2_PVR_MESA). Compositors use the GBM
++    * platform and keep the GPU. pmos-galaxy docs/bringup.md B15. */
++   if (disp->Options.ForceSoftware ||
++       !env_var_as_boolean("MESA_PVR_WAYLAND_HW", false))
+       return dri2_initialize_wayland_swrast(disp);
+    else
+       return dri2_initialize_wayland_drm(disp);

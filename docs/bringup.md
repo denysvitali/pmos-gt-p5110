@@ -615,3 +615,14 @@ clients broken, GTK clients software-rendered.
   overlay `wlroots0.20` r50 (my own row-upload fallback; PVRports' fallback read an
   uninitialised pointer), plus their BGRA read quirk. EGL_KHR_platform_gbm is present
   [verified], so their MESA_platform_gbm patch is not needed.
+- cage with patched wlroots: the GLES2 renderer starts on the SGX540 (`uploading
+  rows`, BGRA quirk) [verified]. Then the swapchain test fails with atomic KMS
+  (WLR_DRM_NO_ATOMIC=1 fixes that), and cage aborts on `Assertion failed:
+  scale > 0 (wlr_surface_set_preferred_buffer_scale)`. wlroots logs `@ inf Hz`
+  for a mode drm_info shows as 59.74 Hz [verified]. Refuted: FPU state after PVR
+  init, float ABI (all VFP-args), d8-d15 preservation across blob calls, libm
+  interposition by the blobs, ABI drift from Alpine's extra wlroots patch
+  [all verified by test]. Unexplained.
+- Working configuration (mesa-pvr r55): Wayland EGL clients default to swrast +
+  wl_shm (`MESA_PVR_WAYLAND_HW=1` opts back in). mutter (GBM platform) keeps
+  the SGX. The no-modifiers patch (r54) was dropped.
