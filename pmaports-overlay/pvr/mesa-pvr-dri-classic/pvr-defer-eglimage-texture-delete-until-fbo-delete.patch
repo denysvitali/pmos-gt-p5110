@@ -10,13 +10,18 @@ FBO, waits on the freed sync and crashes in libGLESv2_PVR_MESA.so + 0x16e6c
 Reproduced standalone; plain textures and still-attached image textures are
 not affected (pmos-galaxy docs/bringup.md B17).
 
-Wrap glEGLImageTargetTexture2DOES, glFramebufferTexture2D, glDeleteTextures
-and glDeleteFramebuffers in the GLES2 dispatch table: an EGLImage texture
-ever attached to a still-live FBO of the current context is really deleted
-only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
+mutter also hits it through offscreen FBOs on plain textures that it draws
+the client's EGLImage textures into (seen with PVR_FBO_DEFER_DEBUG=1).
+
+Wrap glEGLImageTargetTexture2DOES, glFramebufferTexture2D, glActiveTexture,
+glBindTexture, glBindFramebuffer, glDrawArrays, glDrawElements,
+glDeleteTextures and glDeleteFramebuffers in the GLES2 dispatch table. An FBO
+references an EGLImage texture that is attached to it or bound on a unit
+during a draw into it. Such a texture is really deleted only after every FBO
+of the current context that references it. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 ---
 --- a/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 09:02:48.952794941 +0000
-+++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 10:15:12.577425135 +0000
++++ b/src/mesa/drivers/dri/pvr/mesa_context.c	2026-11-20 11:08:02.499598072 +0000
 @@ -34,8 +34,11 @@
   */
  
@@ -29,7 +34,7 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
  
  #include "main/version.h"
  #include "main/errors.h"
-@@ -145,6 +148,282 @@
+@@ -145,6 +148,441 @@
  	}
  }
  
@@ -42,13 +47,25 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 + * (libGLESv2_PVR_MESA.so + 0x16e6c) or spins. Plain textures and image
 + * textures that stay attached are not affected.
 + *
-+ * So the real deletion of an EGLImage texture that was ever attached to a
-+ * still-live FBO of this context is deferred until those FBOs are deleted.
++ * mutter also hits it with offscreen FBOs on plain textures that it draws the
++ * client's EGLImage textures into, so an FBO references an image texture when
++ * the texture is attached to it or bound on a unit during a draw into it.
++ *
++ * The real deletion of an EGLImage texture referenced by a still-live FBO of
++ * this context is deferred until those FBOs are deleted.
 + */
 +typedef void (*pvr_delete_fn)(GLsizei, const GLuint *);
 +typedef void (*pvr_fbtex_fn)(GLenum, GLenum, GLenum, GLuint, GLint);
 +typedef void (*pvr_eglimage_fn)(GLenum, void *);
 +typedef void (*pvr_getint_fn)(GLenum, GLint *);
++typedef void (*pvr_active_fn)(GLenum);
++typedef void (*pvr_bind_fn)(GLenum, GLuint);
++typedef void (*pvr_drawarrays_fn)(GLenum, GLint, GLsizei);
++typedef void (*pvr_drawelements_fn)(GLenum, GLsizei, GLenum, const void *);
++
++#define PVR_MAX_UNITS 16
++/* Bindings as the application set them, per context. */
++struct pvr_ctx_state { void *ctx; GLuint fbo; GLuint unit; GLuint tex[PVR_MAX_UNITS]; };
 +
 +struct pvr_fbo_att { void *ctx; GLuint fbo; GLuint tex; };
 +struct pvr_img_tex { void *ctx; GLuint tex; int deferred; };
@@ -59,6 +76,12 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +static pvr_fbtex_fn real_FramebufferTexture2D;
 +static pvr_eglimage_fn real_EGLImageTargetTexture2DOES;
 +static pvr_getint_fn real_GetIntegerv;
++static pvr_active_fn real_ActiveTexture;
++static pvr_bind_fn real_BindTexture, real_BindFramebuffer;
++static pvr_drawarrays_fn real_DrawArrays;
++static pvr_drawelements_fn real_DrawElements;
++static struct pvr_ctx_state *gpsState;
++static unsigned guState, guStateCap;
 +static struct pvr_fbo_att *gpsAtt;
 +static unsigned guAtt, guAttCap;
 +static struct pvr_img_tex *gpsImg;
@@ -94,6 +117,117 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +static void pvr_drop_img(struct pvr_img_tex *psImg)
 +{
 +	*psImg = gpsImg[--guImg];
++}
++
++/* The calling thread's context state; created on first use. Lock held. */
++static struct pvr_ctx_state *pvr_state(void)
++{
++	for (unsigned i = 0; i < guState; i++)
++		if (gpsState[i].ctx == gpvCurCtx)
++			return &gpsState[i];
++	if (!gpvCurCtx)
++		return NULL;
++	if (guState == guStateCap)
++	{
++		unsigned uCap = guStateCap ? guStateCap * 2 : 4;
++		void *pv = realloc(gpsState, uCap * sizeof(*gpsState));
++		if (!pv)
++			return NULL;
++		gpsState = pv;
++		guStateCap = uCap;
++	}
++	gpsState[guState] = (struct pvr_ctx_state){ .ctx = gpvCurCtx };
++	return &gpsState[guState++];
++}
++
++/* Record that fbo references image texture tex. Lock held. */
++static void pvr_add_ref(GLuint fbo, GLuint tex, const char *why)
++{
++	if (!fbo || !tex)
++		return;
++	for (unsigned i = 0; i < guAtt; i++)
++		if (gpsAtt[i].ctx == gpvCurCtx && gpsAtt[i].fbo == fbo && gpsAtt[i].tex == tex)
++			return;
++	if (guAtt == guAttCap)
++	{
++		unsigned uCap = guAttCap ? guAttCap * 2 : 32;
++		void *pv = realloc(gpsAtt, uCap * sizeof(*gpsAtt));
++		if (!pv)
++			return;
++		gpsAtt = pv;
++		guAttCap = uCap;
++	}
++	gpsAtt[guAtt++] = (struct pvr_fbo_att){ gpvCurCtx, fbo, tex };
++	PVR_DBG("ctx %p ref fbo %u tex %u (%s)\n", gpvCurCtx, fbo, tex, why);
++}
++
++static void
++wrap_ActiveTexture(GLenum texture)
++{
++	struct pvr_ctx_state *psState;
++
++	real_ActiveTexture(texture);
++	pthread_mutex_lock(&gsWrapLock);
++	psState = pvr_state();
++	if (psState && texture >= 0x84C0 && texture < 0x84C0 + PVR_MAX_UNITS)
++		psState->unit = texture - 0x84C0;
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++static void
++wrap_BindTexture(GLenum target, GLuint texture)
++{
++	struct pvr_ctx_state *psState;
++
++	real_BindTexture(target, texture);
++	if (target != PVR_TEXTURE_2D)
++		return;
++	pthread_mutex_lock(&gsWrapLock);
++	psState = pvr_state();
++	if (psState)
++		psState->tex[psState->unit] = texture;
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++static void
++wrap_BindFramebuffer(GLenum target, GLuint framebuffer)
++{
++	struct pvr_ctx_state *psState;
++
++	real_BindFramebuffer(target, framebuffer);
++	pthread_mutex_lock(&gsWrapLock);
++	psState = pvr_state();
++	if (psState)
++		psState->fbo = framebuffer;
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++/* A draw into an FBO references the image textures bound on any unit. */
++static void pvr_note_draw(void)
++{
++	struct pvr_ctx_state *psState;
++
++	pthread_mutex_lock(&gsWrapLock);
++	psState = pvr_state();
++	if (psState && psState->fbo && guImg)
++		for (unsigned u = 0; u < PVR_MAX_UNITS; u++)
++			if (psState->tex[u] && pvr_find_img(psState->tex[u]))
++				pvr_add_ref(psState->fbo, psState->tex[u], "draw");
++	pthread_mutex_unlock(&gsWrapLock);
++}
++
++static void
++wrap_DrawArrays(GLenum mode, GLint first, GLsizei count)
++{
++	pvr_note_draw();
++	real_DrawArrays(mode, first, count);
++}
++
++static void
++wrap_DrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices)
++{
++	pvr_note_draw();
++	real_DrawElements(mode, count, type, indices);
 +}
 +
 +static void
@@ -145,26 +279,7 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +	PVR_DBG("ctx %p fb-texture fbo %d att %#x textarget %#x tex %u img %d\n",
 +		gpvCurCtx, fbo, attachment, textarget, texture, bImg);
 +	if (bImg)
-+	{
-+		for (unsigned i = 0; fbo && i < guAtt; i++)
-+			if (gpsAtt[i].ctx == gpvCurCtx && gpsAtt[i].fbo == (GLuint)fbo &&
-+			    gpsAtt[i].tex == texture)
-+				fbo = 0;
-+		if (fbo)
-+		{
-+			if (guAtt == guAttCap)
-+			{
-+				unsigned uCap = guAttCap ? guAttCap * 2 : 32;
-+				void *pv = realloc(gpsAtt, uCap * sizeof(*gpsAtt));
-+				if (!pv)
-+					goto out;
-+				gpsAtt = pv;
-+				guAttCap = uCap;
-+			}
-+			gpsAtt[guAtt++] = (struct pvr_fbo_att){ gpvCurCtx, fbo, texture };
-+		}
-+	}
-+out:
++		pvr_add_ref(fbo, texture, "attach");
 +	pthread_mutex_unlock(&gsWrapLock);
 +}
 +
@@ -187,6 +302,15 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +	}
 +
 +	pthread_mutex_lock(&gsWrapLock);
++	{
++		struct pvr_ctx_state *psState = pvr_state();
++
++		/* GL unbinds deleted textures. */
++		for (GLsizei i = 0; psState && i < n; i++)
++			for (unsigned u = 0; u < PVR_MAX_UNITS; u++)
++				if (psState->tex[u] == textures[i])
++					psState->tex[u] = 0;
++	}
 +	for (GLsizei i = 0; i < n; i++)
 +	{
 +		struct pvr_img_tex *psImg = pvr_find_img(textures[i]);
@@ -221,6 +345,14 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +		return;
 +
 +	pthread_mutex_lock(&gsWrapLock);
++	{
++		struct pvr_ctx_state *psState = pvr_state();
++
++		/* GL rebinds 0 when the bound FBO is deleted. */
++		for (GLsizei j = 0; psState && j < n; j++)
++			if (psState->fbo == framebuffers[j])
++				psState->fbo = 0;
++	}
 +	for (unsigned i = 0; i < guAtt; )
 +	{
 +		int bDrop = 0;
@@ -270,6 +402,12 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +		else
 +			i++;
 +	}
++	for (unsigned i = 0; i < guState; i++)
++		if (gpsState[i].ctx == psPVRContext)
++		{
++			gpsState[i] = gpsState[--guState];
++			break;
++		}
 +	pthread_mutex_unlock(&gsWrapLock);
 +}
 +
@@ -294,6 +432,32 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
 +		real_FramebufferTexture2D = (pvr_fbtex_fn)pfFunc;
 +		return (_glapi_proc)wrap_FramebufferTexture2D;
 +	}
++	if (!strcmp(psFunc, "glActiveTexture"))
++	{
++		real_ActiveTexture = (pvr_active_fn)pfFunc;
++		return (_glapi_proc)wrap_ActiveTexture;
++	}
++	if (!strcmp(psFunc, "glBindTexture"))
++	{
++		real_BindTexture = (pvr_bind_fn)pfFunc;
++		return (_glapi_proc)wrap_BindTexture;
++	}
++	if (!strcmp(psFunc, "glBindFramebuffer") ||
++	    !strcmp(psFunc, "glBindFramebufferOES"))
++	{
++		real_BindFramebuffer = (pvr_bind_fn)pfFunc;
++		return (_glapi_proc)wrap_BindFramebuffer;
++	}
++	if (!strcmp(psFunc, "glDrawArrays"))
++	{
++		real_DrawArrays = (pvr_drawarrays_fn)pfFunc;
++		return (_glapi_proc)wrap_DrawArrays;
++	}
++	if (!strcmp(psFunc, "glDrawElements"))
++	{
++		real_DrawElements = (pvr_drawelements_fn)pfFunc;
++		return (_glapi_proc)wrap_DrawElements;
++	}
 +	if (!strcmp(psFunc, "glDeleteTextures"))
 +	{
 +		real_DeleteTextures = (pvr_delete_fn)pfFunc;
@@ -312,7 +476,7 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
  static void
  pvrdri_add_mesa_dispatch(struct _glapi_table *psTable,
  			 PVRDRIAPIType eAPI,
-@@ -176,6 +455,8 @@
+@@ -176,6 +614,8 @@
  		}
  	}
  
@@ -321,7 +485,7 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
  	asFunc[0] = psFunc;
  	iOffset = _glapi_add_dispatch(asFunc, "");
  	if (iOffset == -1)
-@@ -254,6 +535,7 @@
+@@ -254,6 +694,7 @@
  void
  pvrdri_set_null_dispatch_table(void)
  {
@@ -329,7 +493,7 @@ only after those FBOs are. PVR_FBO_DEFER_DEBUG=1 logs every wrapped call.
  	_glapi_set_dispatch(NULL);
  }
  
-@@ -262,5 +544,6 @@
+@@ -262,5 +703,6 @@
  {
  	struct _glapi_table *psTable = pvrdri_get_dispatch_table(psPVRContext->psPVRScreen, psPVRContext->eAPI);
  

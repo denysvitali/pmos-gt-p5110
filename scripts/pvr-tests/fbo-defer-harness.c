@@ -15,6 +15,10 @@ static void f_getint(GLenum e, GLint *v) { *v = e == 0x8069 ? bound_tex : e == 0
 static void f_img(GLenum t, void *i) { (void)t; (void)i; }
 static void f_fbtex(GLenum a, GLenum b, GLenum c, GLuint t, GLint l) { (void)a;(void)b;(void)c;(void)t;(void)l; }
 static void f_deltex(GLsizei n, const GLuint *t) { for (int i = 0; i < n; i++) sprintf(log_ + strlen(log_), "T%u ", t[i]); }
+static void f_active(GLenum u) { (void)u; }
+static void f_bind(GLenum t, GLuint n) { (void)t; (void)n; }
+static void f_drawa(GLenum m, GLint f, GLsizei c) { (void)m; (void)f; (void)c; }
+static void f_drawe(GLenum m, GLsizei c, GLenum t, const void *i) { (void)m; (void)c; (void)t; (void)i; }
 static void f_delfbo(GLsizei n, const GLuint *f) { for (int i = 0; i < n; i++) sprintf(log_ + strlen(log_), "F%u ", f[i]); }
 #define CHECK(want) do { printf("%-40s %s [%s]\n", #want, strcmp(log_, want) ? "FAIL" : "ok", log_); fails += !!strcmp(log_, want); log_[0] = 0; } while (0)
 int main(void) {
@@ -24,6 +28,11 @@ int main(void) {
 	void (*fbtex)(GLenum, GLenum, GLenum, GLuint, GLint) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glFramebufferTexture2D", (_glapi_proc)f_fbtex);
 	void (*deltex)(GLsizei, const GLuint *) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glDeleteTextures", (_glapi_proc)f_deltex);
 	void (*delfbo)(GLsizei, const GLuint *) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glDeleteFramebuffers", (_glapi_proc)f_delfbo);
+	void (*active)(GLenum) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glActiveTexture", (_glapi_proc)f_active);
+	void (*bindtex)(GLenum, GLuint) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glBindTexture", (_glapi_proc)f_bind);
+	void (*bindfb)(GLenum, GLuint) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glBindFramebuffer", (_glapi_proc)f_bind);
+	void (*drawa)(GLenum, GLint, GLsizei) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glDrawArrays", (_glapi_proc)f_drawa);
+	void (*drawe)(GLenum, GLsizei, GLenum, const void *) = (void *)pvrdri_wrap_func(PVRDRI_API_GLES2, NULL, "glDrawElements", (_glapi_proc)f_drawe);
 	if ((void *)pvrdri_wrap_func(PVRDRI_API_GLES1, NULL, "glDeleteTextures", (_glapi_proc)f_deltex) != (void *)f_deltex) { puts("GLES1 wrapped: FAIL"); fails++; }
 	gpvCurCtx = &c1;
 	GLuint t5 = 5, t6 = 6, t7 = 7, f9 = 9, f10 = 10;
@@ -46,5 +55,22 @@ int main(void) {
 	/* many textures (> stack buffer) */
 	GLuint many[40]; for (int i = 0; i < 40; i++) many[i] = 100 + i; deltex(40, many);
 	printf("40 plain deletes: %s\n", strlen(log_) > 150 ? "ok" : "FAIL"); fails += strlen(log_) <= 150; log_[0] = 0;
+	/* draw-time references (mutter's offscreen FBOs on plain textures) */
+	gpvCurCtx = &c1;
+	GLuint t20 = 20, t21 = 21, f30 = 30, f31 = 31;
+	bound_tex = 20; img(0x0DE1, NULL);                 /* image texture 20 */
+	bindfb(0x8D40, 0); active(0x84C1); bindtex(0x0DE1, 20); drawa(5, 0, 4);  /* into fbo 0: no ref */
+	deltex(1, &t20); CHECK("T20 ");
+	bound_tex = 20; img(0x0DE1, NULL); bindtex(0x0DE1, 20);
+	bindfb(0x8D40, 30); drawe(4, 6, 0x1403, NULL);     /* draw into fbo 30 with tex 20 on unit 1 */
+	bindfb(0x8D40, 31); active(0x84C0); bindtex(0x0DE1, 21); drawa(5, 0, 4); /* plain tex: no ref */
+	deltex(1, &t20); CHECK("");                         /* deferred: fbo 30 references it */
+	deltex(1, &t21); CHECK("T21 ");
+	delfbo(1, &f31); CHECK("F31 ");
+	delfbo(1, &f30); CHECK("F30 T20 ");
+	/* deleted FBO resets the tracked binding: a later draw does not ref fbo 30 */
+	bound_tex = 20; img(0x0DE1, NULL); active(0x84C0); bindtex(0x0DE1, 20);
+	bindfb(0x8D40, 30); delfbo(1, &f30); log_[0] = 0; drawa(5, 0, 4);
+	deltex(1, &t20); CHECK("T20 ");
 	printf("%s\n", fails ? "FAILURES" : "all ok"); return fails;
 }

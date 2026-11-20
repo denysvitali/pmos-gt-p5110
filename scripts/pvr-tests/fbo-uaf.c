@@ -1,6 +1,6 @@
 // Does deleting an FBO whose colour attachment was an EGLImage (dmabuf) texture,
 // after the texture and image are gone, crash the PVR blob (+0x16e6c)?
-// Usage: fbo-uaf a|b|c|d|e|f|g|h|i
+// Usage: fbo-uaf a|b|c|d|e|f|g|h|i|j|k|m
 //   a: render into FBO(tex<-image), delete tex, destroy image, free bo, delete FBO
 //   b: control: delete FBO first, then tex, image, bo
 //   c: like a, but the image and bo stay alive
@@ -10,6 +10,10 @@
 //   g: like a, but the texture is deleted while the FBO is bound (implicit detach)
 //   h: like f, but a plain glTexImage2D texture (no EGLImage)
 //   i: like f, but the image and bo stay alive
+//   j: FBO on a plain texture; draw sampling the EGLImage texture into it, then
+//      delete the image texture, destroy image and bo, delete the FBO
+//   k: like j, with glFinish before the deletes
+//   m: like j, but the image and bo stay alive
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
@@ -53,6 +57,46 @@ int main(int argc, char **argv)
 	if (im == EGL_NO_IMAGE_KHR) { printf("image import failed 0x%x\n", eglGetError()); return 2; }
 
 	GLuint tex, fbo;
+	if (mode == 'j' || mode == 'k' || mode == 'm') {
+		GLuint dst;
+		glGenTextures(1, &tex);
+		glBindTexture(GL_TEXTURE_2D, tex);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		t2d(GL_TEXTURE_2D, im);
+		glGenTextures(1, &dst);
+		glBindTexture(GL_TEXTURE_2D, dst);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glGenFramebuffers(1, &fbo);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dst, 0);
+		printf("fbo status 0x%x (complete=0x8cd5)\n", glCheckFramebufferStatus(GL_FRAMEBUFFER));
+		const char *vs = "attribute vec2 p; varying vec2 uv; void main(){uv=p*0.5+0.5; gl_Position=vec4(p,0.,1.);}";
+		const char *fs = "precision mediump float; varying vec2 uv; uniform sampler2D s; void main(){gl_FragColor=texture2D(s,uv);}";
+		GLuint pr = glCreateProgram(), v = glCreateShader(GL_VERTEX_SHADER), f = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(v, 1, &vs, NULL); glCompileShader(v); glAttachShader(pr, v);
+		glShaderSource(f, 1, &fs, NULL); glCompileShader(f); glAttachShader(pr, f);
+		glBindAttribLocation(pr, 0, "p"); glLinkProgram(pr); glUseProgram(pr);
+		static const GLfloat q[] = { -1, -1, 1, -1, -1, 1, 1, 1 };
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, q); glEnableVertexAttribArray(0);
+		glViewport(0, 0, W, H);
+		glBindTexture(GL_TEXTURE_2D, tex);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		STEP("drew image texture into fbo");
+		if (mode == 'k') { glFinish(); STEP("finished"); }
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		STEP("delete image tex"); glDeleteTextures(1, &tex);
+		if (mode != 'm') {
+			STEP("destroy image"); di(d, im);
+			STEP("destroy bo"); gbm_bo_destroy(bo);
+		}
+		STEP("delete fbo"); glDeleteFramebuffers(1, &fbo);
+		STEP("delete dst"); glDeleteTextures(1, &dst);
+		STEP("finish"); glFinish();
+		printf("done mode %c\n", mode);
+		return 0;
+	}
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

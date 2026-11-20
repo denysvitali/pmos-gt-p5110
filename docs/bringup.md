@@ -738,3 +738,18 @@ clients broken, GTK clients software-rendered.
   charger [verified]. After boot, with no manual write, the chip reads
   `0x01=0x66 CFG_PIN=0x04 CMD_A=0x02 CMD_B=0x03 STAT_C=0x05`. Net +0.76–0.81 A
   with GNOME running at backlight 3/7, 25 %. Wi-Fi up.
+- r59 log of mutter's sequence with a hardware client [verified]: the client
+  buffer becomes image texture 3710053, which is *never attached*. Right after,
+  offscreen FBOs 1890027/1960028/2030029 are created on plain textures. At
+  client exit the image texture is deleted (`img 1 attached 0`, so r58 did not
+  defer it), then the FBOs. The shell hung at `delete-fbo 1890027` in one run.
+  In the next it got past that and died at `delete-fbo 1960028` (SIGSEGV
+  +0x16e6c). GNOME with a hardware client reproduces it in 3/3 runs.
+- Standalone repros of this order do not trigger it (2/2 each) [verified]:
+  `scripts/pvr-tests/mutter-seq.c` p/q (200 frames, image textures drawn into an
+  offscreen that is drawn onto a stage FBO), r/s (+ a second context rendering
+  into the dmabufs), and `mutter-xproc.c` t/u (a real client process that renders
+  and exits). What else mutter does is unknown.
+- r60 also records a reference when a draw into an FBO has an EGLImage texture
+  bound on any unit (wraps glActiveTexture/glBindTexture/glBindFramebuffer/
+  glDrawArrays/glDrawElements). Harness: 18 checks [verified]. Test bench: GNOME.
