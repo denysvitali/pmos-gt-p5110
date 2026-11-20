@@ -673,3 +673,12 @@ clients broken, GTK clients software-rendered.
   [verified hang, unknown cause]. The next boot was responsive. `MMU_Alloc: RA_Alloc
   of VMArena failed` (an 11 MB General-heap allocation at shell start) appears
   on every boot, CI mesa included [verified].
+- **The GNOME crash is not the miscompilation** [verified]: CI mesa-pvr r57 (no
+  crossdirect) + sgx-ddk-um r51 + wlroots0.20 r51 installed, fresh boot, GNOME.
+  Client with `MESA_PVR_WAYLAND_HW=1 MESA_LOADER_DRIVER_OVERRIDE=pvr`. Run 1:
+  libGLESv2_PVR_MESA mapped in the client, 1089 commits in 20 s. Afterwards
+  mutter stopped answering D-Bus. By run 3 gnome-shell was gone: SIGSEGV
+  `libGLESv2_PVR_MESA.so + 0x16e6c`, the same site as B15. The only PVR_K
+  allocation failure that boot was the 11 MB one at shell start (106 s), not
+  at the crash (~166 s). r57 keeps swrast as the client default; the session after
+  reboot is responsive.
