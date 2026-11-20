@@ -3,7 +3,7 @@ maintainer="Achill Gilgenast <achill@achill.org>"
 pkgname=wlroots0.20
 pkgver=0.20.2
 _pkgver=${pkgver/_/-}
-pkgrel=50
+pkgrel=51
 pkgdesc="Modular Wayland compositor library"
 url="https://gitlab.freedesktop.org/wlroots/wlroots"
 license="MIT"
@@ -44,7 +44,7 @@ source="https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/$_pkgver/wlroot
 	render-gles2-support-PowerVR-SGX.patch
 	"
 builddir="$srcdir/wlroots-$_pkgver"
-options="!check" # no test suite
+options="!check !pmb:crossdirect" # no test suite; crossdirect miscompiles floats (B16)
 
 # whether this is the default version (latest stable wlroots)
 _default="yes"
