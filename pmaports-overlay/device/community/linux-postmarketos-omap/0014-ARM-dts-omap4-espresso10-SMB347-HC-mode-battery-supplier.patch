@@ -1,10 +1,11 @@
 From: Denys Vitali <denys@denv.it>
 Subject: [PATCH] ARM: dts: omap4: espresso10: SMB347 HC mode, battery supplier
 
-Select USB high-current mode at 900 mA; the NV default (USB5, 500 mA) does
-not cover the system load. 1.8 A trips the over-current limit of a
-Raspberry Pi 4 host port. Link the fuel gauge to the charger, so that the
-battery status is no longer "Unknown".
+Select USB high-current mode at 1.8 A; the NV default (USB5, 500 mA) does
+not cover the system load. On a wall charger 1.8 A nets about +0.75 A against
++0.4 A at 900 mA. It trips the over-current limit of a Raspberry Pi 4 host
+port. Link the fuel gauge to the charger, so that the battery status is no
+longer "Unknown".
 ---
 --- a/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso10.dts	2026-11-17 06:59:11.869999899 +0000
 +++ b/arch/arm/boot/dts/ti/omap/omap4-samsung-espresso10.dts	2026-11-17 07:01:06.672504061 +0000
@@ -16,12 +17,12 @@ battery status is no longer "Unknown".
 +			/*
 +			 * HC mode as the vendor kernel uses for its charger.
 +			 * Without it the chip stays in USB5 (500 mA), which
-+			 * does not cover the system load. 900 mA, not 1.8 A:
-+			 * 1.8 A trips the over-current limit of common USB
-+			 * host ports (seen on a Raspberry Pi 4).
++			 * does not cover the system load. 1.8 A is for wall
++			 * chargers; it trips the over-current limit of some
++			 * USB host ports (seen on a Raspberry Pi 4).
 +			 */
 +			summit,usb-hc-mode;
-+			summit,usb-current-limit-microamp = <900000>;
++			summit,usb-current-limit-microamp = <1800000>;
 +		};
 +	};
 +

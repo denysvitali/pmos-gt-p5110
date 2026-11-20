@@ -8,13 +8,13 @@
 # re-plug reloads the OTP defaults. This loop re-applies the stock values
 # whenever they are lost. All writes are to volatile registers.
 #
-# ICL_REG: CFG_CURRENT_LIMIT, DC nibble | USB-HC nibble. Default 0x63 = DC 1.8 A,
-# USB-HC 900 mA, which a Raspberry Pi 4 port sustains; 1.8 A trips its
-# over-current limit.
+# ICL_REG: CFG_CURRENT_LIMIT, DC nibble | USB-HC nibble. Default 0x66 = 1.8 A
+# both, for a wall charger (the kernel DT uses the same). On a Raspberry Pi 4
+# port use ICL_REG=0x63 (USB-HC 900 mA): 1.8 A trips its over-current limit.
 set -u
 bus=4
 addr=0x06
-icl=${ICL_REG:-0x63}
+icl=${ICL_REG:-0x66}
 dev=/sys/bus/i2c/devices/$bus-0006
 
 g() { i2cget -y -a $bus $addr "$1" b; }
