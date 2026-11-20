@@ -1,0 +1,32 @@
+From: Denys Vitali <denys@denv.it>
+Subject: [PATCH] egl/wayland: pvr: MESA_PVR_WAYLAND_HW=0 makes clients use swrast
+
+EGL Wayland clients render on the SGX540 by default. With window animations
+on, a client's exit can still crash gnome-shell inside the closed SGX blob
+(pmos-galaxy docs/bringup.md B17), so MESA_PVR_WAYLAND_HW=0 switches clients to
+swrast + wl_shm. The GBM platform (the compositor) is unaffected.
+---
+--- a/src/egl/drivers/dri2/platform_wayland.c	2026-11-20 00:20:59.633863558 +0000
++++ b/src/egl/drivers/dri2/platform_wayland.c	2026-11-20 00:20:59.733862238 +0000
+@@ -44,6 +44,7 @@
+ #include "loader.h"
+ #include "util/u_vector.h"
+ #include "util/anon_file.h"
++#include "util/debug.h"
+ #include "eglglobals.h"
+ 
+ #include <wayland-egl-backend.h>
+@@ -2151,7 +2152,12 @@
+ EGLBoolean
+ dri2_initialize_wayland(_EGLDisplay *disp)
+ {
+-   if (disp->Options.ForceSoftware)
++   /* pvr: MESA_PVR_WAYLAND_HW=0 makes Wayland clients render with swrast and
++    * present through wl_shm. Client GPU buffers can crash gnome-shell inside
++    * the SGX blob when window animations are on. pmos-galaxy docs/bringup.md
++    * B17. */
++   if (disp->Options.ForceSoftware ||
++       !env_var_as_boolean("MESA_PVR_WAYLAND_HW", true))
+       return dri2_initialize_wayland_swrast(disp);
+    else
+       return dri2_initialize_wayland_drm(disp);

@@ -792,3 +792,6 @@ clients broken, GTK clients software-rendered.
   first, the TWL6032 pwrbutton ~10 ms later. gpio-keys' DT `key-power` is the
   upstream power key (wakeup-source), so 0016 duplicated it. Dropped 0016
   (kernel r58).
+- mesa-pvr r63: Wayland EGL clients use the SGX by default (user decision, with
+  animations off in the kiosk). `MESA_PVR_WAYLAND_HW=0` falls back to swrast +
+  wl_shm (`egl-wayland-pvr-clients-swrast-opt-out.patch`).
