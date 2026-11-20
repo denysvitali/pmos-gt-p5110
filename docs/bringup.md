@@ -706,7 +706,11 @@ clients broken, GTK clients software-rendered.
   glDeleteTextures and glDeleteFramebuffers(OES). An EGLImage texture ever
   attached to a still-live FBO of the current context is deleted only after those
   FBOs, which turns f/g into a. The logic is unit-tested on the Pi
-  (`scripts/pvr-tests/fbo-defer-harness.c`, 12 checks) [verified]. Not yet on hardware.
+  (`scripts/pvr-tests/fbo-defer-harness.c`, 12 checks) [verified].
+- r58 on hardware (CI build; the shipped pvr_dri.so carries the wrapper's name
+  literals, which r57 lacks) [verified]: repro modes a b c d h i pass, **f and g pass
+  2/2 each** (both crashed before), e still crashes (separate bug, control).
+  GNOME with hardware EGL clients not yet retested (battery at 14%).
 - Battery: with GNOME stopped and the backlight at 6, the tablet drew −0.75 A on
   the Pi port and browned out once (boot-ROM loop ~17 min). Backlight 0 gives
   +0.40 A [verified]. SMB347 had reverted to `CMD_A=0x02 CFG_PIN=0x04` after VBUS
