@@ -762,3 +762,15 @@ clients broken, GTK clients software-rendered.
 - r61: each image texture also holds a __DRIimage reference
   (`PVRDRIScreenGetDRIImage` + `PVRDRIRefImage`) until its real deletion. Harness:
   24 checks [verified].
+- r61 under GNOME (default animations): image 3710053 was now held past
+  `delete-fbo 1890027`, which no longer crashed. The SIGSEGV +0x16e6c moved to
+  `delete-fbo 2030029`, an FBO with no recorded image reference [verified].
+  Probably a transitive dependency: it samples another offscreen's texture
+  [inferred].
+- **r61 + `org.gnome.desktop.interface enable-animations false`: 8/8 pass**
+  [verified]. Hardware EGL in every run, 1129–1143 commits per 20 s (~56 fps),
+  same shell PID, D-Bus answering, no new coredump. The per-window offscreen
+  FBOs come from the window animations.
+- Leak: the long-lived FBO 350005 draws every client buffer, so r61 keeps one
+  image texture (and its __DRIimage) per client run: 7 pending after 7 runs
+  [verified].
