@@ -644,3 +644,13 @@ clients broken, GTK clients software-rendered.
   sgx-ddk-um). The GNOME/SGX crash may share this cause [inferred, testing].
 - Native rebuild on the tablet: `abuild -r` in ~/build (abuild key and group
   present).
+- Native build of wlroots0.20 r50 (pmbootstrap inside the Debian chroot on the
+  tablet, armv7 host, no QEMU: `/usr/local/sbin/native-pkg-build`): wlr_output_init
+  stores `0x3f800000` like Alpine's build [verified]. This confirms the CI
+  environment (x86_64 runner, QEMU armv7 chroot + crossdirect) miscompiles floats.
+- **cage kiosk with a GPU client on the SGX540 works** (native wlroots,
+  WLR_DRM_NO_ATOMIC=1, seatd) [verified]: mode `1280x800 @ 59.743 Hz`, no
+  assertion, es2gears_wayland full screen (hardware EGL, mesa-pvr r51) 762 and 899
+  commits in two 60 s runs (~13–15 fps), 0 protocol errors, cage rc=0.
+- Native mesa-pvr build started, to test whether the GNOME crash is the same
+  miscompilation.
