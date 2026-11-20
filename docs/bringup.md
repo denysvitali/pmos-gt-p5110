@@ -721,3 +721,15 @@ clients broken, GTK clients software-rendered.
   `icl_tbl` index 6) it nets +0.67–0.80 A. CFG_PIN `0x60` vs `0x04` changes
   nothing at the same limit. 900 mA stays the DT value because a Pi 4 port trips
   at 1.8 A (B9). Right after the replug it netted +0.02 A; the cause is unknown.
+- **r58 under GNOME: not fixed** [verified]. 8-run test with hardware EGL clients
+  (wall charger, backlight 3/7). Run 1 used the GPU (1093 commits), then mutter
+  stopped answering D-Bus. No coredump; the shell hung. Main thread stack: Wayland
+  request → mutter → cogl → `pvr_dri.so +0x3e63` (wrapper) → blob name delete →
+  FBO flush → the wait loop (`0x16e88`) → libsrv_um event wait. That is the spin
+  variant of the same use-after-free: the FBO delete went through the wrapper but
+  still waited on freed memory.
+- Hypothesis H2 (the FBO targets a plain texture and samples the EGLImage
+  texture) is refuted: repro modes j (draw sampling the image texture into a
+  plain-texture FBO, then free everything), k (j + glFinish) and m (j, image
+  kept) all pass, 2 runs each [verified]. mutter's real sequence is unknown;
+  r59 logs it (`PVR_FBO_DEFER_DEBUG=1`).
