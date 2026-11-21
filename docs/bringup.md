@@ -862,3 +862,23 @@ clients broken, GTK clients software-rendered.
   depth+stencil, no-config contexts, FBO→0 rebinding, buffer age.
 - Fix: `dbm-dumb-buffers-with-4096-byte-rows.patch` (sgx-ddk-um r52): width 1024,
   bpp 32, height ⌈size/4096⌉.
+- sgx-ddk-um r52 (CI build) on hardware [verified]: `CREATE_DUMB height=1000
+  width=1024 bpp=32` → `pitch=4096 size=4096000` (was 32768000). Under GNOME: no
+  `MMU_Alloc` failures after a session start, and the shell's `PVRSRVBridgeCall:
+  Failed to access device` is gone. The two-surface repro (`gbm-paths w`) now
+  renders.
+- **GNOME is still black after that fix** [verified]: scanout `00000000`, render
+  target `000000ff`. An apitrace of gnome-shell, replayed with eglretrace on the
+  tablet's SGX into an Xwayland window, shows the UI (`222226`, `57c365`, …) [verified].
+  So mutter's GL stream is fine; its output does not reach its GBM window surface.
+  Every step reproduced standalone works: mutter's exact shaders, MVP and vertex
+  blob into an FBO and into a depth+stencil GBM window surface, config id 7
+  (no MSAA), a card1 EGL prelude, eglBindWaylandDisplayWL, two surfaces.
+- A mutter offscreen (FBO 490007) was COMPLETE at creation (call 3754) and
+  `INCOMPLETE_MISSING_ATTACHMENT` at a later swap (under r63 at the time) [verified].
+- Wi-Fi outage 00:02 → 09:48 (tablet kept running) [verified]: repeated
+  locally generated disconnects (reason 0/3), brcmf `event handler failed (72)`,
+  NetworkManager `activated -> failed (supplicant-timeout)`; 21 reconnects that did
+  not stick.
+- CI's sgx-ddk-um r52 run also rebuilt mesa-pvr r63, so two different r63 binaries
+  exist (releases packages-bc5f37815389 and packages-0bff54c45c5c) [verified].
