@@ -887,3 +887,11 @@ clients broken, GTK clients software-rendered.
   connect wlan0`; failure 3 → reload brcmfmac. Installed on the tablet; the healthy
   path ran with no action [verified]. The failure branches were checked with stub
   commands on the Pi [verified]; not yet seen on a real outage.
+- kmscube (gbm_surface + EGL window surface + KMS page flips, mutter's
+  presentation model) on pvr shows on screen [verified]. Both scanout buffers hold
+  the cube (`808080ff` background, green faces). Note: kmscube exits at once with
+  stdin at EOF ("user interrupted!"), so give it a pipe.
+- GNOME on pvr with sgx r52 is still black under `MUTTER_DEBUG_FORCE_KMS_MODE=simple`
+  and under `MUTTER_DEBUG_KMS_THREAD_TYPE=user` [verified]. Open question: what in
+  mutter's process stops its own frames from reaching its window surface, when its
+  recorded GL stream, kmscube's path and every EGL step on their own work.
