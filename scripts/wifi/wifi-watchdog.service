@@ -1,0 +1,7 @@
+[Unit]
+Description=Recover Wi-Fi when the gateway stops answering
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/wifi-watchdog

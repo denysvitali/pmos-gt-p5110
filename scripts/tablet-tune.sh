@@ -71,6 +71,15 @@ systemctl enable --now espresso-charger.service
 systemctl is-active -q espresso-charger.service || [ -e /sys/bus/i2c/devices/4-0006/driver ] ||
 	{ echo "ERROR: neither espresso-charger nor the smb347 driver is active" >&2; exit 1; }
 
+# Wi-Fi watchdog: reconnect, then reload brcmfmac, when the gateway stops
+# answering (docs/bringup.md B18).
+install -D -m 755 "$here/wifi/wifi-watchdog.sh" /usr/local/sbin/wifi-watchdog
+install -m 644 "$here/wifi/wifi-watchdog.service" /etc/systemd/system/wifi-watchdog.service
+install -m 644 "$here/wifi/wifi-watchdog.timer" /etc/systemd/system/wifi-watchdog.timer
+systemctl daemon-reload
+systemctl enable --now wifi-watchdog.timer
+systemctl is-active -q wifi-watchdog.timer || { echo "ERROR: wifi-watchdog.timer not active" >&2; exit 1; }
+
 # A/B kernel tooling (docs/bringup.md B14).
 install -D -m 755 "$here/kernel-ab.sh" /usr/local/sbin/kernel-ab
 install -D -m 755 "$here/samsung-reboot-mode.py" /usr/local/sbin/samsung-reboot-mode

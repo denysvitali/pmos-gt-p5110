@@ -882,3 +882,8 @@ clients broken, GTK clients software-rendered.
   not stick.
 - CI's sgx-ddk-um r52 run also rebuilt mesa-pvr r63, so two different r63 binaries
   exist (releases packages-bc5f37815389 and packages-0bff54c45c5c) [verified].
+- Wi-Fi watchdog (`scripts/wifi/wifi-watchdog.*`, installed by tablet-tune.sh), a timer
+  every 2 min: gateway ping OK → nothing; failures 1–2 → `nmcli device disconnect/
+  connect wlan0`; failure 3 → reload brcmfmac. Installed on the tablet; the healthy
+  path ran with no action [verified]. The failure branches were checked with stub
+  commands on the Pi [verified]; not yet seen on a real outage.
